@@ -1,5 +1,5 @@
+flask
+flask-asyncio
 pyrogram
 tgcrypto
 requests
-python-dotenv
-flask
