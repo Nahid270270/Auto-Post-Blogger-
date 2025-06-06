@@ -1,7 +1,9 @@
-import os
-import re
-import requests
+# ✅ Blogger Auto Post Bot
+# ✅ Requires: Pyrogram, requests, python-dotenv
+
 from pyrogram import Client, filters
+import requests
+import os
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -9,74 +11,52 @@ load_dotenv()
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-
 BLOGGER_API_KEY = os.getenv("BLOGGER_API_KEY")
 BLOG_ID = os.getenv("BLOG_ID")
 
 app = Client("blogger_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
-# --- Movie Parser ---
-def parse_movie_message(text: str) -> dict:
-    title_match = re.search(r"🎬\s*(.+?)\s*(\d{4})", text)
-    lang_match = re.search(r"(.*?)", text)
-    desc_match = re.search(r"📝(.+?)(📥|$)", text, re.DOTALL)
-    link_matches = re.findall(r"(https?://[^\s]+)", text)
-    tags = re.findall(r"#(\w+)", text)
-
-    return {
-        "title": title_match.group(1).strip() if title_match else "Untitled",
-        "year": title_match.group(2) if title_match else "",
-        "language": lang_match.group(1).strip() if lang_match else "Unknown",
-        "description": desc_match.group(1).strip() if desc_match else "No description.",
-        "download_links": link_matches,
-        "labels": tags,
-    }
-
-# --- HTML Template ---
-def make_html_post(movie: dict) -> dict:
-    # Format download links as HTML list
-    link_html = "".join(
-        f'<li><a href="{link}" target="_blank" rel="nofollow">Download Link {i+1}</a></li>'
-        for i, link in enumerate(movie["download_links"])
-    )
-    html = f"""
-    <h2>{movie['title']} ({movie['year']})</h2>
-    <p><strong>Language:</strong> {movie['language']}</p>
-    <p><strong>Description:</strong></p>
-    <p>{movie['description']}</p>
-    <p><strong>Download Links:</strong></p>
-    <ul>{link_html}</ul>
+# ✅ Simple HTML template for blog posts
+def format_html(title, body):
+    return f"""
+    <h2>{title}</h2>
+    <p>{body}</p>
     <hr>
-    <p><em>Posted via Telegram Movie Bot</em></p>
+    <p><em>Posted via Telegram Blogger Bot</em></p>
     """
 
-    seo_title = f"{movie['title']} ({movie['year']}) | {movie['language']} Movie Download"
-    return {
+# ✅ Function to publish post to Blogger
+def publish_to_blogger(title, content):
+    url = f"https://www.googleapis.com/blogger/v3/blogs/{BLOG_ID}/posts/?key={BLOGGER_API_KEY}"
+    data = {
         "kind": "blogger#post",
-        "title": seo_title,
-        "labels": movie["labels"],
-        "content": html,
+        "blog": {"id": BLOG_ID},
+        "title": title,
+        "content": content
     }
+    headers = {"Content-Type": "application/json"}
+    response = requests.post(url, json=data, headers=headers)
+    return response.status_code == 200
 
-# --- Blogger API POST ---
-def post_to_blogger(post_data: dict):
-    url = f"https://www.googleapis.com/blogger/v3/blogs/{BLOG_ID}/posts/"
-    params = {"key": BLOGGER_API_KEY}
-    response = requests.post(url, params=params, json=post_data)
-    return response.status_code, response.json()
+# ✅ Command: /post Title | Content
+@app.on_message(filters.command("post") & filters.private)
+def post_to_blog(client, message):
+    try:
+        if "|" not in message.text:
+            return message.reply("⚠️ Use format: /post Title | Content")
 
-# --- Telegram Handler ---
-@app.on_message(filters.channel & filters.text)
-async def handle_channel_post(client, message):
-    movie_data = parse_movie_message(message.text)
-    post_data = make_html_post(movie_data)
-    status, res = post_to_blogger(post_data)
+        raw = message.text.split("/post", 1)[1].strip()
+        title, body = [x.strip() for x in raw.split("|", 1)]
+        html = format_html(title, body)
 
-    if status == 200:
-        await message.reply("✅ Blogger এ পোস্ট হয়ে গেছে!")
-    else:
-        await message.reply(f"❌ পোস্টে সমস্যা হয়েছে!\n{res}")
+        sent = publish_to_blogger(title, html)
+        if sent:
+            message.reply("✅ Posted to Blogger!")
+        else:
+            message.reply("❌ Failed to post. Check your API key and Blog ID.")
 
-if __name__ == "__main__":
-    print("🤖 Bot is running...")
-    app.run()
+    except Exception as e:
+        message.reply(f"❌ Error: {e}")
+
+print("🤖 Blogger Bot is running...")
+app.run()
