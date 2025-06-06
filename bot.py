@@ -1,22 +1,16 @@
-# ✅ Blogger Auto Post Bot
-# ✅ Requires: Pyrogram, requests, python-dotenv
-
 from pyrogram import Client, filters
 import requests
 import os
-from dotenv import load_dotenv
 
-load_dotenv()
-
-API_ID = int(os.getenv("API_ID"))
-API_HASH = os.getenv("API_HASH")
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-BLOGGER_API_KEY = os.getenv("BLOGGER_API_KEY")
-BLOG_ID = os.getenv("BLOG_ID")
+# 🔐 Load sensitive data from environment variables (server-based)
+API_ID = int(os.environ["API_ID"])
+API_HASH = os.environ["API_HASH"]
+BOT_TOKEN = os.environ["BOT_TOKEN"]
+BLOGGER_API_KEY = os.environ["BLOGGER_API_KEY"]
+BLOG_ID = os.environ["BLOG_ID"]
 
 app = Client("blogger_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
-# ✅ Simple HTML template for blog posts
 def format_html(title, body):
     return f"""
     <h2>{title}</h2>
@@ -25,7 +19,6 @@ def format_html(title, body):
     <p><em>Posted via Telegram Blogger Bot</em></p>
     """
 
-# ✅ Function to publish post to Blogger
 def publish_to_blogger(title, content):
     url = f"https://www.googleapis.com/blogger/v3/blogs/{BLOG_ID}/posts/?key={BLOGGER_API_KEY}"
     data = {
@@ -38,7 +31,6 @@ def publish_to_blogger(title, content):
     response = requests.post(url, json=data, headers=headers)
     return response.status_code == 200
 
-# ✅ Command: /post Title | Content
 @app.on_message(filters.command("post") & filters.private)
 def post_to_blog(client, message):
     try:
