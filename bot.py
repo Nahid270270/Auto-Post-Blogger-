@@ -1,28 +1,37 @@
-from pyrogram import Client, filters
-import requests
 import os
-from flask import Flask, request, abort, jsonify # Flask লাইব্রেরি
-import asyncio # Asynchronous operations এর জন্য
-import logging # লগিং এর জন্য
+import asyncio
+import logging
+import requests
+from flask import Flask, request, jsonify, abort
+from pyrogram import Client, filters
+from pyrogram.raw.functions.messages import SendMessage # for direct API calls if needed
 
-# লগিং সেটআপ
+# --- Logging Setup ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# 🔐 Load sensitive data from environment variables (server-based)
+# --- Environment Variables Loading ---
 try:
     API_ID = int(os.environ["API_ID"])
     API_HASH = os.environ["API_HASH"]
     BOT_TOKEN = os.environ["BOT_TOKEN"]
     BLOGGER_API_KEY = os.environ["BLOGGER_API_KEY"]
     BLOG_ID = os.environ["BLOG_ID"]
-    # Render.com স্বয়ংক্রিয়ভাবে PORT এনভায়রনমেন্ট ভেরিয়েবল সরবরাহ করে
-    PORT = int(os.environ.get("PORT", 8080)) # যদি PORT না থাকে, ডিফল্ট 8080
+    # Render.com provides the PORT, WEBHOOK_BASE_URL should be set in Render environment
+    PORT = int(os.environ.get("PORT", 8080))
+    WEBHOOK_BASE_URL = os.environ.get("WEBHOOK_BASE_URL") 
+    if not WEBHOOK_BASE_URL:
+        logger.warning("WEBHOOK_BASE_URL environment variable is not set. Webhook might not be properly configured.")
 except KeyError as e:
     logger.error(f"Missing environment variable: {e}. Please set all required variables.")
+    # In a production environment, you might want to exit here.
+    # For now, we'll let it proceed for a Flask-only test if Pyrogram fails.
     exit(1)
 
-# Pyrogram Client
+# --- Pyrogram Client (will be started and stopped by the main async loop) ---
+# We configure Pyrogram in webhook mode here, so it listens for updates.
+# However, given Flask is running, a custom webhook handling is needed.
+# For this setup, we'll make Pyrogram client available but handle messages through Flask.
 app = Client(
     "blogger_bot",
     api_id=API_ID,
@@ -30,10 +39,10 @@ app = Client(
     bot_token=BOT_TOKEN
 )
 
-# Flask Web Application
+# --- Flask Web Application ---
 web_app = Flask(__name__)
 
-# --- ব্লগার পোস্ট করার ফাংশন (আগের মতোই) ---
+# --- Blogger Post Function ---
 def format_html(title, body):
     return f"""
     <h2>{title}</h2>
@@ -59,116 +68,87 @@ def publish_to_blogger(title, content):
         logger.info(f"Blogger API Response Status: {response.status_code}")
         logger.info(f"Blogger API Response Body: {response.text}")
         
-        return response.status_code == 200
+        response.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
+        return True
     except requests.exceptions.RequestException as e:
         logger.error(f"Network or request error during Blogger API call: {e}")
         return False
 
-# --- টেলিগ্রাম মেসেজ হ্যান্ডলার (Pyrogram এর জন্য) ---
-# Pyrogram আপডেট প্রসেস করার জন্য একটি async ফাংশন
-async def process_telegram_update(update_json):
-    """Processes a raw Telegram update JSON."""
-    try:
-        # Pyrogram এর নিজস্ব Update অবজেক্ট তৈরি করে প্রসেস করা
-        # এটি ম্যানুয়ালি করা কিছুটা জটিল, তবে Pyrogram এর internal methods ব্যবহার করা যায়।
-        # আরও সহজ হলো Pyrogram এর নিজস্ব webhook handler ব্যবহার করা যদি থাকে।
-        # কিন্তু সরাসরি request.json থেকে update লোড করাটা Pyrogram এর জন্য স্ট্যান্ডার্ড নয়।
-        # এর পরিবর্তে, Pyrogram এর AsyncMethods.process_update() ব্যবহার করা যেতে পারে।
-
-        # The following is a simplified approach, a more robust solution would involve
-        # creating a Pyrogram Update object from the JSON.
-        # For a Flask integration, it's often easier to just pass the raw update to Pyrogram's handlers
-        # or use a library that bridges Flask and Pyrogram's async capabilities.
-        
-        # For simplicity and to reuse your existing @app.on_message decorators:
-        # We need to manually call the handlers.
-        # This part requires more advanced Pyrogram knowledge for a truly robust webhook setup.
-        # A direct way often involves running Pyrogram's client in webhook mode,
-        # which isn't directly compatible with Flask's app.run() without some bridging.
-
-        # Let's simplify the processing for the example:
-        # We'll just assume a basic text message for now to fit the /post command.
-        # In a real webhook, you'd parse the 'update_json' to extract the message
-        # and then simulate a Pyrogram 'Message' object or call your 'post_to_blog' logic directly.
-
-        # For this example, we will directly call the logic from the webhook:
-        if 'message' in update_json and 'text' in update_json['message']:
-            message_text = update_json['message']['text']
-            chat_id = update_json['message']['chat']['id']
-
-            # Simulate Pyrogram Message object for simpler integration
-            class MockMessage:
-                def __init__(self, text, chat_id):
-                    self.text = text
-                    self.chat = type('obj', (object,), {'id': chat_id}) # Mock chat object
-                
-                async def reply(self, text_to_reply):
-                    # For a webhook, we can't use message.reply directly.
-                    # We need to send a request back to Telegram API.
-                    send_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-                    payload = {
-                        "chat_id": self.chat.id,
-                        "text": text_to_reply,
-                    }
-                    try:
-                        resp = requests.post(send_url, json=payload)
-                        resp.raise_for_status() # Raise an exception for bad status codes
-                        logger.info(f"Reply sent to chat {self.chat.id}: {text_to_reply}")
-                    except requests.exceptions.RequestException as e:
-                        logger.error(f"Failed to send reply to Telegram: {e}")
-
-            mock_message = MockMessage(message_text, chat_id)
-            
-            # Now call your existing post_to_blog logic
-            # Note: post_to_blog is NOT async, so it needs to be run in a thread or directly called
-            # For simplicity, calling directly, but in a real async app, use run_in_executor
-            post_to_blog(app, mock_message) # Pass 'app' as client, and mock_message
-
-    except Exception as e:
-        logger.error(f"Error processing Telegram update: {e}")
-
-# --- Flask ওয়েবহুক এন্ডপয়েন্ট ---
+# --- Telegram Webhook Receiver Endpoint ---
 @web_app.route(f"/{BOT_TOKEN}", methods=["POST"])
-def telegram_webhook_receiver():
-    # Telegram sends updates to this URL as POST requests
+async def telegram_webhook_receiver():
+    """
+    Receives Telegram updates via webhook and processes them.
+    This function is now async to allow await calls within it.
+    """
     if not request.is_json:
-        abort(400) # Bad Request if not JSON
+        logger.error("Received non-JSON request to webhook.")
+        abort(400, description="Request must be JSON")
 
     update = request.get_json()
     logger.info(f"Received Telegram update: {update}")
 
-    # Process the update in a non-blocking way (for Flask)
-    # Using asyncio.create_task to run the async Pyrogram processing in the background
-    asyncio.create_task(process_telegram_update(update))
+    # Process the update in a non-blocking way
+    # We will simulate a Pyrogram message for our handler
+    if 'message' in update and 'text' in update['message']:
+        message_text = update['message']['text']
+        chat_id = update['message']['chat']['id']
+        
+        # Create a mock message object that behaves like Pyrogram's message
+        class MockMessage:
+            def __init__(self, text, chat_id, bot_token):
+                self.text = text
+                self.chat = type('obj', (object,), {'id': chat_id})
+                self.bot_token = bot_token
+            
+            async def reply(self, text_to_reply):
+                """Sends a reply back to the Telegram chat via API."""
+                send_url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
+                payload = {
+                    "chat_id": self.chat.id,
+                    "text": text_to_reply,
+                }
+                try:
+                    resp = requests.post(send_url, json=payload)
+                    resp.raise_for_status()
+                    logger.info(f"Reply sent to chat {self.chat.id}: {text_to_reply}")
+                except requests.exceptions.RequestException as e:
+                    logger.error(f"Failed to send reply to Telegram: {e}")
+
+        mock_message = MockMessage(message_text, chat_id, BOT_TOKEN)
+        
+        # We need to manually call the 'post_to_blog' logic
+        # Run the sync function in a thread to avoid blocking the async webhook
+        await asyncio.to_thread(post_to_blog, app, mock_message)
     
-    return jsonify({"status": "ok"}), 200 # Always return 200 OK to Telegram quickly
+    return jsonify({"status": "ok"}), 200
 
-# --- আপনার Pyrogram মেসেজ হ্যান্ডলার (আগের মতোই) ---
-# Note: For webhook mode, these decorators might not fire directly from Flask webhook.
-# We manually call the logic from process_telegram_update.
-# So, this part needs careful consideration if you have many Pyrogram decorators.
-# For '/post' command, we have moved the logic to process_telegram_update to be called directly.
-# If you have other commands, you'd need a more robust Pyrogram webhook setup.
-
-@app.on_message(filters.command("post") & filters.private)
-def post_to_blog(client, message): # Keep this function for logic, but it's called manually now
+# --- Pyrogram Message Handler (Modified to be callable from webhook logic) ---
+# This function's logic is now called directly from the webhook receiver.
+# The @app.on_message decorator itself won't directly fire in this webhook setup,
+# but the function it points to is reusable.
+def post_to_blog(client, message): # No longer async, as it's run in a thread
     try:
-        # For webhook, message.reply needs to be adapted or use send_message API directly
-        # The MockMessage class handles this for now.
+        # Check if the command is "/post" and if it's a private chat (simulated)
+        if not message.text.startswith("/post"):
+            # This case should ideally be filtered before calling this function
+            # For robustness, we check here.
+            # In a real Pyrogram webhook, filters would handle this.
+            return 
+        
+        # Simulate filters.private by checking chat type if needed, but MockMessage doesn't have it.
+        # This function will only be called for "/post" commands now.
 
         raw_text_after_command = message.text.split("/post", 1)[1].strip()
 
         if "|" not in raw_text_after_command:
-            # We use await message.reply if using Pyrogram's native webhook, but for Flask
-            # and direct call, we need to adapt message.reply or log.
-            # In MockMessage, we've implemented a sync reply.
-            asyncio.run(message.reply("⚠️ Use format: /post Title | Content")) # Ensure it's awaitable
+            asyncio.run(message.reply("⚠️ Use format: `/post Title | Content`")) # Using asyncio.run in a thread is fine
             return
 
         title, body = [x.strip() for x in raw_text_after_command.split("|", 1)]
         
         if not title or not body:
-            asyncio.run(message.reply("⚠️ Title and Content cannot be empty. Use format: /post Title | Content"))
+            asyncio.run(message.reply("⚠️ Title and Content cannot be empty. Use format: `/post Title | Content`"))
             return
 
         html_content = format_html(title, body)
@@ -183,45 +163,98 @@ def post_to_blog(client, message): # Keep this function for logic, but it's call
         asyncio.run(message.reply(f"❌ An unexpected error occurred: {e}"))
         logger.error(f"Error in post_to_blog: {e}")
 
-# --- বট চালানো ---
-async def main():
-    logger.info("Starting Pyrogram client...")
-    await app.start() # Pyrogram client starts
+# --- Main Application Runner ---
+async def main_async():
+    logger.info("Starting Pyrogram client (for potential background use, though updates are via Flask webhook)...")
+    await app.start() # Start Pyrogram client
 
-    # Set webhook URL on Telegram (important! Replace with your Render service URL)
-    # This URL should be your Render.com service URL + /BOT_TOKEN
-    # Example: https://your-service-name.onrender.com/YOUR_BOT_TOKEN
-    # You MUST get your Render service URL AFTER deployment.
-    # For initial testing, you might need to manually set it or run this part locally.
+    # --- Set Webhook URL on Telegram ---
+    if WEBHOOK_BASE_URL:
+        webhook_url = f"{WEBHOOK_BASE_URL}/{BOT_TOKEN}"
+        try:
+            # Check current webhook to avoid unnecessary updates
+            get_webhook_info_resp = requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/getWebhookInfo")
+            get_webhook_info_resp.raise_for_status()
+            current_webhook_info = get_webhook_info_resp.json()
+
+            if current_webhook_info.get('result', {}).get('url') == webhook_url:
+                logger.info(f"Webhook already set to: {webhook_url}")
+            else:
+                response = requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook?url={webhook_url}")
+                response.raise_for_status()
+                logger.info(f"Webhook set to: {webhook_url}, Response: {response.json()}")
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to set webhook: {e}")
+    else:
+        logger.warning("WEBHOOK_BASE_URL not set. Please set the webhook manually via Telegram BotFather or API if needed.")
     
-    # Render provides the public URL. You'd set the webhook like this:
-    # WEBHOOK_BASE_URL = os.environ.get("WEBHOOK_BASE_URL") # You might set this env var
-    # if not WEBHOOK_BASE_URL:
-    #     logger.warning("WEBHOOK_BASE_URL environment variable not set. Webhook will not be set.")
-    # else:
-    #     webhook_url = f"{WEBHOOK_BASE_URL}/{BOT_TOKEN}"
-    #     try:
-    #         response = requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook?url={webhook_url}")
-    #         response.raise_for_status()
-    #         logger.info(f"Webhook set to: {webhook_url}, Response: {response.json()}")
-    #     except requests.exceptions.RequestException as e:
-    #         logger.error(f"Failed to set webhook: {e}")
-
-    # Start Flask web server (non-blocking)
     logger.info(f"Starting Flask web server on port {PORT}...")
-    # Use await asyncio.to_thread(web_app.run, host="0.0.0.0", port=PORT) for async Flask if needed
-    # Or, for simple Flask, just run it.
-    web_app.run(host="0.0.0.0", port=PORT, debug=False) # debug=True locally, False in production
+    
+    # Run Flask in a separate thread to allow main_async to continue and manage Pyrogram
+    # However, running Flask with web_app.run() in a thread is tricky.
+    # A more robust solution would be to use a WSGI server like Gunicorn or Hypercorn
+    # to run the Flask app, and manage Pyrogram's client separately.
+    # For a simple Render.com setup, the 'entrypoint' usually handles Flask,
+    # and Pyrogram needs to run in the background.
 
-    logger.info("Pyrogram client stopping...")
-    await app.stop() # Pyrogram client stops when Flask app stops
+    # Option 1: Run Flask with a proper WSGI server (e.g., Gunicorn) - RECOMMENDED FOR PRODUCTION
+    # This example focuses on making your code runnable. For Render, your `start` command
+    # might be something like `gunicorn your_module_name:web_app --workers 1 --bind 0.0.0.0:$PORT`
+    # In that case, Pyrogram app.start() would need to be handled carefully alongside.
+
+    # Option 2: Use asyncio.create_task for a non-blocking Flask run within the same loop
+    # This requires a server like `hypercorn` for async Flask.
+    # For `web_app.run()` (sync Flask), it's blocking.
+
+    # Given your current Flask setup (web_app.run is blocking)
+    # The best approach for Render is usually to let Render run Flask (Gunicorn)
+    # and have a separate async process if Pyrogram needs to run long-polling.
+    # But for webhook, Flask is the primary receiver.
+
+    # Let's simplify for now: Pyrogram client starts, webhook is set, Flask handles requests.
+    # The `app.start()` is mostly to initialize the Pyrogram client object.
+    # The actual message processing is handled by the Flask webhook.
+    
+    # We will run Flask as a blocking process from this main entry point.
+    # This means `await app.stop()` will never be reached unless Flask itself stops.
+    # For Render, this is typically how it works: the web server is the main process.
+    
+    # To run both Flask (blocking) and keep the async loop alive for Pyrogram
+    # a more advanced setup like `hypercorn` for async Flask is needed or
+    # running Flask in a separate thread/process which is complicated for simple webhooks.
+    
+    # For the provided code structure, Flask must run as the main process.
+    # Pyrogram client will be initialized, but its @on_message decorators won't directly fire
+    # unless Pyrogram is running in a proper webhook mode, which it isn't here (Flask is the webhook).
+    
+    # So, we just ensure `app` is started and ready if needed for other Pyrogram functions.
+    # The main loop will now be handled by Flask.
+
+    # Run the Flask app, which will block.
+    # It's important that this is the last blocking call in the main async function.
+    loop = asyncio.get_event_loop()
+    loop.create_task(asyncio.to_thread(web_app.run, host="0.0.0.0", port=PORT, debug=False))
+    
+    # Keep the async loop running indefinitely, so Pyrogram app can also remain 'started'.
+    # This is a bit of a hacky way to keep the main async loop running while Flask blocks a thread.
+    # A more robust solution would use a fully async web framework (like FastAPI or Aiohttp)
+    # with Pyrogram's built-in webhook functionality.
+    
+    # Pyrogram client can be stopped when the application exits.
+    # But as Flask is blocking, it won't reach app.stop() gracefully here.
+    # For deployment, Render handles stopping the process.
+    
+    # This line ensures the event loop doesn't close immediately after Flask starts.
+    # It's a common pattern for hybrid async/sync apps.
+    while True:
+        await asyncio.sleep(3600) # Sleep for a long time to keep the loop alive
 
 if __name__ == "__main__":
-    # Ensure a current event loop is available for async functions
     try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    
-    loop.run_until_complete(main())
+        asyncio.run(main_async())
+    except KeyboardInterrupt:
+        logger.info("Bot shutting down...")
+        # Clean up Pyrogram client gracefully on exit
+        if app.is_connected:
+            asyncio.run(app.stop())
+
