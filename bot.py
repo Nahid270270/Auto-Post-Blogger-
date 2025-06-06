@@ -5,7 +5,7 @@ import requests
 from flask import Flask, request, jsonify, abort
 from pyrogram import Client, filters
 from pyrogram.types import Message
-from flask_asyncio import AsyncFlask # Import AsyncFlask
+# from flask_asyncio import AsyncFlask # REMOVED: No longer needed
 
 # --- Logging Setup ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -25,27 +25,31 @@ try:
     
     if not WEBHOOK_BASE_URL:
         logger.error("WEBHOOK_BASE_URL environment variable is NOT SET. Webhook will not be configured correctly. Please set it to your Render.com service's public URL.")
-        # Exit if critical env var is missing, as webhook won't work
         exit(1) 
 
 except KeyError as e:
     logger.error(f"Missing environment variable: {e}. Please set all required variables.")
-    exit(1) # Exit if essential env vars are missing
+    exit(1) 
 
 # --- Pyrogram Client ---
+# IMPORTANT: For webhook mode, Pyrogram client itself doesn't need to do long-polling.
+# We explicitly set `no_updates=True` and `take_out=True` to signal this.
+# The updates will be fed to `app.process_update()` by the Flask webhook.
 app = Client(
     "blogger_bot",
     api_id=API_ID,
     api_hash=API_HASH,
     bot_token=BOT_TOKEN,
-    # In webhook mode, Pyrogram does not need to start long-polling.
-    # It will process updates via the webhook endpoint.
-    # We'll use a specific setup for Flask to feed updates to Pyrogram.
+    no_updates=True, # Tells Pyrogram not to start its own update fetching
+    take_out=True    # Further optimizes for webhook (avoids redundant API calls)
 )
 
 # --- Flask Web Application ---
-# Use AsyncFlask to properly handle async operations within Flask
-web_app = AsyncFlask(__name__)
+# Using standard Flask, as Pyrogram's `process_update` is asynchronous but can be called
+# from a sync Flask route using `asyncio.run` or `asyncio.create_task` with a pre-existing loop.
+# Or, if Flask route is async (using an async WSGI like Hypercorn), then `await app.process_update`.
+# For simplicity with `web_app.run()`, we'll use `asyncio.run` locally in the Flask route.
+web_app = Flask(__name__)
 
 # --- Blogger Post Function ---
 def format_html(title, body):
@@ -81,9 +85,10 @@ def publish_to_blogger(title, content):
 
 # --- Telegram Webhook Receiver Endpoint ---
 @web_app.route(f"/{BOT_TOKEN}", methods=["POST"])
-async def telegram_webhook_receiver():
+def telegram_webhook_receiver():
     """
     Receives Telegram updates via webhook and passes them to Pyrogram.
+    This route is sync, but we use asyncio.run to call async methods.
     """
     if not request.is_json:
         logger.error("Received non-JSON request to webhook.")
@@ -93,12 +98,23 @@ async def telegram_webhook_receiver():
     logger.info(f"Received Telegram update: {update_data}")
 
     try:
-        # Pass the raw update data to Pyrogram for processing
-        # This allows Pyrogram to handle all its decorators like @app.on_message
-        await app.process_update(update_data)
+        # Get the current running event loop. If none, create one.
+        # This is crucial for running async Pyrogram methods within a sync Flask route.
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        # Pass the raw update data to Pyrogram for processing in the current loop
+        # We use asyncio.run_coroutine_threadsafe to schedule it in the loop
+        # and wait for it. Or more simply, asyncio.run if this is the only async context.
+        # Given Flask typically runs on a sync WSGI server (like gunicorn),
+        # asyncio.run() here is safer as it creates its own loop per request if needed.
+        asyncio.run(app.process_update(update_data))
         logger.info("Update successfully passed to Pyrogram.")
     except Exception as e:
-        logger.error(f"Error processing Telegram update via Pyrogram: {e}")
+        logger.error(f"Error processing Telegram update via Pyrogram: {e}", exc_info=True)
     
     return jsonify({"status": "ok"}), 200
 
@@ -107,7 +123,8 @@ async def telegram_webhook_receiver():
 async def post_to_blog_command_handler(client, message: Message):
     """
     Handles the /post command.
-    This function is now async, allowing direct use of await message.reply().
+    This function is async, allowing direct use of await message.reply()
+    and await asyncio.to_thread().
     """
     logger.info(f"Received /post command from chat ID: {message.chat.id}")
     try:
@@ -128,7 +145,7 @@ async def post_to_blog_command_handler(client, message: Message):
         html_content = format_html(title, body)
 
         # Call the sync function publish_to_blogger in a separate thread
-        # to avoid blocking the async event loop.
+        # to avoid blocking the async event loop of Pyrogram.
         sent = await asyncio.to_thread(publish_to_blogger, title, html_content) 
         
         if sent:
@@ -145,7 +162,9 @@ async def post_to_blog_command_handler(client, message: Message):
 # --- Main Application Runner ---
 async def main():
     logger.info("Starting Pyrogram client...")
-    await app.start() # Start Pyrogram client
+    # This `app.start()` call is important to initialize Pyrogram's internal structures
+    # even in webhook mode, so `app.process_update()` can function correctly.
+    await app.start() 
 
     # --- Set Webhook URL on Telegram ---
     webhook_url = f"{WEBHOOK_BASE_URL}/{BOT_TOKEN}"
@@ -163,26 +182,28 @@ async def main():
             logger.info(f"Webhook set to: {webhook_url}, Response: {response.json()}")
     except requests.exceptions.RequestException as e:
         logger.error(f"Failed to set webhook: {e}. Please ensure WEBHOOK_BASE_URL is correct and accessible.")
-        # Do not exit, but log the error. The bot might still receive updates if webhook was set manually.
     
     logger.info(f"Starting Flask web server on port {PORT}...")
     
-    # Run the Flask app within the same asyncio event loop
-    # This will block the current coroutine until Flask server stops
-    await web_app.run(host="0.0.0.0", port=PORT, debug=False)
+    # Run the Flask app. This is a blocking call.
+    # When deployed on Render, `web_app.run` will be the main process.
+    # Pyrogram client needs to be started before this to handle updates.
+    web_app.run(host="0.0.0.0", port=PORT, debug=False)
 
     # These lines might not be reached if Flask server runs indefinitely
     logger.info("Flask web server stopped. Stopping Pyrogram client...")
-    await app.stop() # Pyrogram client stops when Flask app stops
+    await app.stop() 
 
 if __name__ == "__main__":
-    # This ensures a clean run and handles potential RuntimeError if loop already exists.
+    # Ensure a current event loop is available for async functions
+    # and run the main async task.
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
         logger.info("Application shutting down due to keyboard interrupt.")
-        # app.stop() will be called if the main() loop reaches its end,
-        # or if the async tasks are properly cancelled.
+        # Attempt to stop Pyrogram client gracefully on exit
+        if app.is_connected:
+            asyncio.run(app.stop())
     except Exception as e:
-        logger.critical(f"An unhandled exception occurred: {e}", exc_info=True)
+        logger.critical(f"An unhandled exception occurred during application startup: {e}", exc_info=True)
 
