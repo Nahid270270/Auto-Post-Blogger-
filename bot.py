@@ -1,15 +1,26 @@
-from pyrogram import Client, filters
-import requests
 import os
+import threading
+import requests
+from pyrogram import Client, filters
+from flask import Flask
 
-# 🔐 Load sensitive data from environment variables (server-based)
+# Environment variables
 API_ID = int(os.environ["API_ID"])
 API_HASH = os.environ["API_HASH"]
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 BLOGGER_API_KEY = os.environ["BLOGGER_API_KEY"]
 BLOG_ID = os.environ["BLOG_ID"]
+PORT = int(os.environ.get("PORT", 8080))
 
+# Initialize Pyrogram client (Telegram Bot)
 app = Client("blogger_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+
+# Initialize Flask app
+flask_app = Flask(__name__)
+
+@flask_app.route("/")
+def home():
+    return "🤖 Blogger Telegram Bot is running."
 
 def format_html(title, body):
     return f"""
@@ -45,10 +56,17 @@ def post_to_blog(client, message):
         if sent:
             message.reply("✅ Posted to Blogger!")
         else:
-            message.reply("❌ Failed to post. Check your API key and Blog ID.")
+            message.reply("❌ Failed to post. Check API key and Blog ID.")
 
     except Exception as e:
         message.reply(f"❌ Error: {e}")
 
-print("🤖 Blogger Bot is running...")
-app.run()
+def run_flask():
+    flask_app.run(host="0.0.0.0", port=PORT)
+
+if __name__ == "__main__":
+    # Start Flask in a thread
+    threading.Thread(target=run_flask).start()
+    print("🤖 Blogger Bot is running with Flask web server...")
+    # Run Pyrogram client (bot)
+    app.run()
