@@ -14,7 +14,7 @@ API_ID = os.environ.get("API_ID")
 API_HASH = os.environ.get("API_HASH")
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 OMDB_API_KEY = os.environ.get("OMDB_API_KEY")
-PORT = int(os.environ.get("PORT", 5000))
+PORT = int(os.environ.get("PORT", 5000))  # Render.com এর জন্য পোর্ট
 
 if not all([API_ID, API_HASH, BOT_TOKEN, OMDB_API_KEY]):
     logging.error("ERROR: One or more environment variables (API_ID, API_HASH, BOT_TOKEN, OMDB_API_KEY) are not set. Exiting.")
@@ -141,16 +141,10 @@ def home():
 def start_bot_sync():
     logging.info("Bot thread started.")
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(app.start())
-        loop.run_forever()
+        app.run()  # Pyrogram নিজেই asyncio লুপ সামলে নেয়, start এবং stop করে
     except Exception as e:
         logging.error(f"Bot encountered an error: {e}")
-    finally:
-        loop.run_until_complete(app.stop())
-        loop.close()
-        logging.info("Bot thread stopped.")
+    logging.info("Bot thread stopped.")
 
 if __name__ == '__main__':
     logging.info("Application starting up...")
