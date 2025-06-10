@@ -1,26 +1,37 @@
 import os
+import logging
+import threading
+import asyncio
+from typing import Optional
+
 import requests
 from pyrogram import Client, filters
 from flask import Flask
-import asyncio
-import logging
-import threading
 
-# --- লগিং সেটআপ ---
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# --------------------------
+# Logging Setup
+# --------------------------
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 
-# --- এনভায়রনমেন্ট ভেরিয়েবল লোড ---
-API_ID = os.environ.get("API_ID")
-API_HASH = os.environ.get("API_HASH")
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
-OMDB_API_KEY = os.environ.get("OMDB_API_KEY")
-PORT = int(os.environ.get("PORT", 5000))  # ওয়েব সার্ভার পোর্ট
+# --------------------------
+# Environment Variables
+# --------------------------
+API_ID = os.getenv("API_ID")
+API_HASH = os.getenv("API_HASH")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+OMDB_API_KEY = os.getenv("OMDB_API_KEY")
+PORT = int(os.getenv("PORT", 5000))
 
 if not all([API_ID, API_HASH, BOT_TOKEN, OMDB_API_KEY]):
-    logging.error("ERROR: One or more environment variables (API_ID, API_HASH, BOT_TOKEN, OMDB_API_KEY) are not set. Exiting.")
+    logging.error("One or more environment variables missing: API_ID, API_HASH, BOT_TOKEN, OMDB_API_KEY")
     exit(1)
 
-# --- Pyrogram ক্লায়েন্ট ইনিশিয়ালাইজেশন ---
+# --------------------------
+# Pyrogram Client Init
+# --------------------------
 try:
     app = Client(
         "movie_poster_bot",
@@ -31,44 +42,51 @@ try:
     )
     logging.info("Pyrogram client initialized successfully.")
 except Exception as e:
-    logging.error(f"FATAL: Error initializing Pyrogram client: {e}")
+    logging.error(f"Failed to initialize Pyrogram client: {e}")
     exit(1)
 
-# --- Flask অ্যাপ্লিকেশন তৈরি ---
+# --------------------------
+# Flask App Init
+# --------------------------
 web_app = Flask(__name__)
 
-# --- ইউটিলিটি ফাংশন ---
+# --------------------------
+# Utility Functions
+# --------------------------
 
-async def get_movie_data(title: str) -> dict | None:
+def fetch_movie_data(title: str) -> Optional[dict]:
+    """
+    Synchronously fetch movie data from OMDb API.
+    """
     url = f"http://www.omdbapi.com/?t={title}&apikey={OMDB_API_KEY}"
     try:
         response = requests.get(url, timeout=10)
         response.raise_for_status()
-        res = response.json()
+        data = response.json()
 
-        if res.get("Response") == "False":
-            logging.warning(f"Movie '{title}' not found on OMDb. Error: {res.get('Error')}")
+        if data.get("Response") == "False":
+            logging.warning(f"Movie '{title}' not found on OMDb: {data.get('Error')}")
             return None
 
-        logging.info(f"Successfully fetched data for movie: {res.get('Title')}")
+        logging.info(f"Fetched data for movie: {data.get('Title')}")
         return {
-            "title": res.get("Title"),
-            "year": res.get("Year"),
-            "language": res.get("Language"),
-            "poster": res.get("Poster")
+            "title": data.get("Title"),
+            "year": data.get("Year"),
+            "language": data.get("Language"),
+            "poster": data.get("Poster")
         }
-    except requests.exceptions.Timeout:
-        logging.error(f"Timeout occurred while fetching movie data for '{title}'.")
-        return None
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Network or request error fetching movie data for '{title}': {e}")
-        return None
+    except requests.Timeout:
+        logging.error(f"Timeout while fetching data for '{title}'.")
+    except requests.RequestException as e:
+        logging.error(f"Request error for '{title}': {e}")
     except ValueError as e:
-        logging.error(f"JSON decoding error for movie data of '{title}': {e}")
-        return None
+        logging.error(f"JSON decode error for '{title}': {e}")
+    return None
 
-def generate_html(data: dict, link1: str, link2: str | None = None) -> str:
-    logging.info(f"Generating HTML for movie: {data['title']}")
+def generate_html(data: dict, link1: str, link2: Optional[str] = None) -> str:
+    """
+    Generate a styled HTML snippet for the movie poster and download links.
+    """
     html = f"""
 <div style="max-width:720px; margin:auto; background:#121212; border-radius:12px; padding:15px; font-family: Arial, sans-serif; color:#fff; box-shadow: 0 0 15px #ff0000;">
   <div style="text-align:center; margin-bottom:15px;">
@@ -83,84 +101,95 @@ def generate_html(data: dict, link1: str, link2: str | None = None) -> str:
     html += "</div></div>"
     return html
 
-# --- Pyrogram হ্যান্ডলার ---
+# --------------------------
+# Pyrogram Handlers
+# --------------------------
 
 @app.on_message(filters.private & filters.command("start"))
-async def start_command(client, message):
-    logging.info(f"Received /start command from user: {message.from_user.id}")
-    await message.reply(
+async def start_handler(client, message):
+    logging.info(f"/start command received from user {message.from_user.id}")
+    text = (
         "👋 **নমস্কার!** আমাকে একটি সিনেমার নাম এবং ডাউনলোডের লিঙ্ক পাঠান:\n\n"
         "`সিনেমার নাম | লিঙ্ক 1 | লিঙ্ক 2 (ঐচ্ছিক)`\n\n"
         "**উদাহরণ:**\n"
-        "`Pathaan 2023 | https://example.com/pathaan1 | https://example.com/pathaan2`",
-        parse_mode="markdown"
+        "`Pathaan 2023 | https://example.com/pathaan1 | https://example.com/pathaan2`"
     )
+    await message.reply(text, parse_mode="markdown")
 
 @app.on_message(filters.private & ~filters.command("start"))
-async def movie_poster_handler(client, message):
-    logging.info(f"Received message from user {message.from_user.id}: {message.text}")
-    parts = [p.strip() for p in message.text.split("|")]
+async def poster_handler(client, message):
+    logging.info(f"Message from {message.from_user.id}: {message.text}")
 
+    parts = [p.strip() for p in message.text.split("|")]
     if len(parts) < 2:
-        logging.warning(f"Invalid format from user {message.from_user.id}: '{message.text}'")
-        return await message.reply(
+        await message.reply(
             "❗ **ভুল ফরম্যাট!** অনুগ্রহ করে এই ফরম্যাটে পাঠান:\n"
             "`সিনেমার নাম | লিঙ্ক 1 | লিঙ্ক 2 (ঐচ্ছিক)`",
             parse_mode="markdown"
         )
+        logging.warning(f"Invalid format from user {message.from_user.id}: {message.text}")
+        return
 
-    title = parts[0]
-    link1 = parts[1]
+    title, link1 = parts[0], parts[1]
     link2 = parts[2] if len(parts) >= 3 else None
 
-    movie_data = await get_movie_data(title)
+    # ডেটা sync ফাংশন থেকে নিচ্ছি কারণ pyrogram handler async কিন্তু requests sync
+    movie_data = await asyncio.to_thread(fetch_movie_data, title)
     if not movie_data:
-        logging.warning(f"Movie data not found for '{title}'. Replying to user.")
-        return await message.reply("❌ **সিনেমাটি খুঁজে পাওয়া যায়নি!** অনুগ্রহ করে সঠিক নাম লিখুন।")
+        await message.reply("❌ **সিনেমাটি খুঁজে পাওয়া যায়নি!** অনুগ্রহ করে সঠিক নাম লিখুন।")
+        logging.warning(f"Movie not found for '{title}', user {message.from_user.id}")
+        return
 
     html_code = generate_html(movie_data, link1, link2)
 
     await message.reply(
         "✅ **আপনার ব্লগার HTML কোড এখানে:**\n\n"
         "`এটি কপি করে আপনার ব্লগারে HTML মোডে পেস্ট করুন।`",
-        quote=True,
-        parse_mode="markdown"
+        parse_mode="markdown",
+        quote=True
     )
     await message.reply(f"```html\n{html_code}\n```", parse_mode="markdown")
-    logging.info(f"HTML code sent to user {message.from_user.id} for movie: {title}")
 
-# --- Flask রুট ---
+    logging.info(f"Sent HTML code for movie '{title}' to user {message.from_user.id}")
+
+# --------------------------
+# Flask Routes
+# --------------------------
 
 @web_app.route('/')
-def home():
-    logging.info("Flask home route accessed. Bot is running.")
+def index():
+    logging.info("Flask root accessed.")
     return "Movie Poster Bot is running!"
 
-# --- বট চালানোর জন্য ফাংশন (থ্রেডে) ---
+# --------------------------
+# Bot Runner Function (thread-safe with new event loop)
+# --------------------------
 
-def start_bot_sync():
-    logging.info("Bot thread started.")
+def start_bot_thread():
+    logging.info("Starting bot thread...")
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
         loop.run_until_complete(app.start())
         loop.run_forever()
-
     except Exception as e:
-        logging.error(f"Bot encountered an error: {e}")
+        logging.error(f"Exception in bot thread: {e}")
     finally:
         loop.run_until_complete(app.stop())
         loop.close()
-    logging.info("Bot thread stopped.")
+        logging.info("Bot thread stopped.")
 
-# --- মেইন ---
+# --------------------------
+# Main Entry Point
+# --------------------------
 
-if __name__ == '__main__':
-    logging.info("Application starting up...")
+if __name__ == "__main__":
+    logging.info("Application starting...")
 
-    bot_thread = threading.Thread(target=start_bot_sync, daemon=True)
+    # Start bot in daemon thread so Flask can run in main thread
+    bot_thread = threading.Thread(target=start_bot_thread, daemon=True)
     bot_thread.start()
-    logging.info("Bot thread initiated.")
 
-    web_app.run(host='0.0.0.0', port=PORT)
+    logging.info("Bot thread started. Starting Flask web server...")
+    web_app.run(host="0.0.0.0", port=PORT)
