@@ -1,36 +1,79 @@
-from pyrogram import Client, filters
-import requests
-from flask import Flask, request
 import os
-import threading
-# import asyncio # asyncio এখানে সরাসরি প্রয়োজন নেই, Pyrogram নিজেই হ্যান্ডেল করবে
+import requests
+from pyrogram import Client, filters
+from flask import Flask # Flask ইম্পোর্ট করা হয়েছে
+import asyncio
+import logging
 
-API_ID = 22697010     # আপনার API_ID
-API_HASH = "fd88d7339b0371eb2a9501d523f3e2a7"
-BOT_TOKEN = "7347631253:AAFVbAQhRkv7XHcy-u838xGy49unjqw8RKE"
-OMDB_API_KEY = "58dcfd4d"
+# লগিং সেটআপ করুন
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# এনভায়রনমেন্ট ভেরিয়েবল থেকে API কী এবং টোকেন লোড করুন
+# প্রোডাকশনে সরাসরি কোডে না লিখে এভাবে লোড করা নিরাপদ
+API_ID = os.environ.get("API_ID")
+API_HASH = os.environ.get("API_HASH")
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+OMDB_API_KEY = os.environ.get("OMDB_API_KEY")
+PORT = int(os.environ.get("PORT", 5000)) # Render এর জন্য পোর্ট
+
+# নিশ্চিত করুন যে প্রয়োজনীয় এনভায়রনমেন্ট ভেরিয়েবলগুলো সেট করা আছে
+if not all([API_ID, API_HASH, BOT_TOKEN, OMDB_API_KEY]):
+    logging.error("One or more environment variables (API_ID, API_HASH, BOT_TOKEN, OMDB_API_KEY) are not set.")
+    exit(1) # ভেরিয়েবল না থাকলে প্রোগ্রাম বন্ধ করুন
 
 # Pyrogram ক্লায়েন্ট ইনিশিয়ালাইজ করুন
-app = Client("movie_poster_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+try:
+    app = Client(
+        "movie_poster_bot",
+        api_id=int(API_ID), # API_ID স্ট্রিং হিসাবে আসে, তাই int এ রূপান্তর করুন
+        api_hash=API_HASH,
+        bot_token=BOT_TOKEN,
+        # সেশন ফাইল তৈরি করার জন্য একটি ফোল্ডার নির্দিষ্ট করুন
+        workdir="."
+    )
+    logging.info("Pyrogram client initialized successfully.")
+except Exception as e:
+    logging.error(f"Error initializing Pyrogram client: {e}")
+    exit(1)
 
 # Flask অ্যাপ্লিকেশন তৈরি করুন
 web_app = Flask(__name__)
 
-# OMDb থেকে সিনেমার ডেটা আনার ফাংশন
-def get_movie_data(title):
-    url = f"http://www.omdbapi.com/?t={title}&apikey={OMDB_API_KEY}"
-    res = requests.get(url).json()
-    if res.get("Response") == "False":
-        return None
-    return {
-        "title": res.get("Title"),
-        "year": res.get("Year"),
-        "language": res.get("Language"),
-        "poster": res.get("Poster")
-    }
+# --- ইউটিলিটি ফাংশন ---
 
-# HTML কোড তৈরির ফাংশন
-def generate_html(data, link1, link2=None):
+async def get_movie_data(title: str) -> dict | None:
+    """
+    OMDb API থেকে সিনেমার ডেটা ফেচ করে।
+    """
+    url = f"http://www.omdbapi.com/?t={title}&apikey={OMDB_API_KEY}"
+    try:
+        response = requests.get(url)
+        response.raise_for_status() # HTTP ত্রুটির জন্য চেক করুন
+        res = response.json()
+        
+        if res.get("Response") == "False":
+            logging.warning(f"Movie '{title}' not found on OMDb.")
+            return None
+        
+        logging.info(f"Successfully fetched data for movie: {res.get('Title')}")
+        return {
+            "title": res.get("Title"),
+            "year": res.get("Year"),
+            "language": res.get("Language"),
+            "poster": res.get("Poster")
+        }
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Error fetching movie data for '{title}': {e}")
+        return None
+    except ValueError as e: # JSON ডিকোড করার ত্রুটি
+        logging.error(f"Error decoding JSON for '{title}': {e}")
+        return None
+
+def generate_html(data: dict, link1: str, link2: str | None = None) -> str:
+    """
+    সিনেমার ডেটা এবং ডাউনলোডের লিঙ্ক ব্যবহার করে একটি HTML কোড তৈরি করে।
+    """
+    logging.info(f"Generating HTML for movie: {data['title']}")
     html = f"""
 <div style="max-width:720px; margin:auto; background:#121212; border-radius:12px; padding:15px; font-family: Arial, sans-serif; color:#fff; box-shadow: 0 0 15px #ff0000;">
   <div style="text-align:center; margin-bottom:15px;">
@@ -45,50 +88,108 @@ def generate_html(data, link1, link2=None):
     html += "</div></div>"
     return html
 
-# Pyrogram স্টার্ট কমান্ড হ্যান্ডলার
+# --- Pyrogram হ্যান্ডলার ---
+
 @app.on_message(filters.private & filters.command("start"))
-async def start(client, message):
-    await message.reply("👋 Send me a movie name like:\n\n`Pathaan 2023 | https://link1.com | https://link2.com (optional)`")
+async def start_command(client, message):
+    """
+    /start কমান্ডের জন্য হ্যান্ডলার।
+    """
+    logging.info(f"Received /start command from user: {message.from_user.id}")
+    await message.reply(
+        "👋 **নমস্কার!** আমাকে একটি সিনেমার নাম এবং ডাউনলোডের লিঙ্ক পাঠান:\n\n"
+        "`সিনেমার নাম | লিঙ্ক 1 | লিঙ্ক 2 (ঐচ্ছিক)`\n\n"
+        "**উদাহরণ:**\n"
+        "`Pathaan 2023 | https://example.com/pathaan1 | https://example.com/pathaan2`",
+        parse_mode="markdown"
+    )
 
-# Pyrogram মুভি হ্যান্ডলার
 @app.on_message(filters.private & ~filters.command("start"))
-async def movie_handler(client, message):
-    parts = message.text.split("|")
+async def movie_poster_handler(client, message):
+    """
+    সিনেমার তথ্য এবং ডাউনলোড লিঙ্ক থেকে HTML কোড তৈরি করার হ্যান্ডলার।
+    """
+    logging.info(f"Received message from user {message.from_user.id}: {message.text}")
+    parts = [p.strip() for p in message.text.split("|")] # অতিরিক্ত স্পেস সরান
+
     if len(parts) < 2:
-        return await message.reply("❗ Please provide in this format:\n`Movie Name | Download Link 1 | Download Link 2 (optional)`")
+        logging.warning(f"Invalid format from user {message.from_user.id}: {message.text}")
+        return await message.reply(
+            "❗ **ভুল ফরম্যাট!** অনুগ্রহ করে এই ফরম্যাটে পাঠান:\n"
+            "`সিনেমার নাম | লিঙ্ক 1 | লিঙ্ক 2 (ঐচ্ছিক)`",
+            parse_mode="markdown"
+        )
 
-    title = parts[0].strip()
-    link1 = parts[1].strip()
-    link2 = parts[2].strip() if len(parts) >= 3 else None
+    title = parts[0]
+    link1 = parts[1]
+    link2 = parts[2] if len(parts) >= 3 else None
 
-    data = get_movie_data(title)
-    if not data:
-        return await message.reply("❌ Movie not found!")
+    # OMDb থেকে সিনেমার ডেটা আনুন
+    movie_data = await get_movie_data(title)
+    if not movie_data:
+        logging.warning(f"Movie data not found for '{title}'.")
+        return await message.reply("❌ **সিনেমাটি খুঁজে পাওয়া যায়নি!** অনুগ্রহ করে সঠিক নাম লিখুন।")
 
-    html_code = generate_html(data, link1, link2)
-    await message.reply("✅ Here is your Blogger HTML Code:\n\n`Copy this and paste into Blogger HTML mode.`", quote=True)
-    await message.reply(f"<code>{html_code}</code>", parse_mode="html")
+    # HTML কোড তৈরি করুন
+    html_code = generate_html(movie_data, link1, link2)
+    
+    # ব্যবহারকারীকে HTML কোড পাঠান
+    await message.reply(
+        "✅ **আপনার ব্লগার HTML কোড এখানে:**\n\n"
+        "`এটি কপি করে আপনার ব্লগারে HTML মোডে পেস্ট করুন।`",
+        quote=True,
+        parse_mode="markdown"
+    )
+    # <code> ট্যাগ ব্যবহার করে কোড ব্লক হিসেবে পাঠানো হয়েছে
+    await message.reply(f"```html\n{html_code}\n```", parse_mode="markdown")
+    logging.info(f"HTML code sent to user {message.from_user.id} for movie: {title}")
 
-# Flask রুট যা বটকে সক্রিয় রাখবে এবং পোর্ট বাইন্ডিং নিশ্চিত করবে
+# --- Flask সার্ভার এবং বট রানিং লজিক ---
+
 @web_app.route('/')
 def home():
-    return "Bot is running and listening!"
+    """
+    Render.com এর স্বাস্থ্য পরীক্ষার জন্য প্রাথমিক রুট।
+    """
+    logging.info("Flask home route accessed. Bot is running.")
+    return "Movie Poster Bot is running!"
 
-# Pyrogram বট চালানোর জন্য একটি ফাংশন (সংশোধিত)
-def run_bot():
-    print("Starting Pyrogram bot...")
-    app.run() # asyncio.run() বাদ দেওয়া হয়েছে, কারণ app.run() নিজেই লুপ হ্যান্ডেল করে
-    print("Pyrogram bot stopped.")
+async def start_bot_async():
+    """
+    Pyrogram বটকে অ্যাসিঙ্ক্রোনাসভাবে শুরু করে।
+    """
+    logging.info("Starting Pyrogram bot (async)...")
+    await app.start()
+    logging.info("Pyrogram bot started.")
+    # বটকে অনির্দিষ্টকালের জন্য চলতে দিন, যাতে মেসেজ হ্যান্ডেল করতে পারে
+    # সাধারণত app.run() এই কাজ করে, কিন্তু async context এ app.idle() ব্যবহার করা হয়
+    await app.idle()
+    logging.info("Pyrogram bot stopped.")
+    await app.stop()
+
+
+def start_bot_sync():
+    """
+    Pyrogram বটকে একটি পৃথক থ্রেডে সিনক্রোনাসভাবে শুরু করার জন্য।
+    """
+    # থ্রেডের মধ্যে একটি নতুন ইভেন্ট লুপ সেট করুন
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(start_bot_async())
+    loop.close()
+
 
 if __name__ == '__main__':
-    # Pyrogram বটকে একটি পৃথক থ্রেডে চালান
-    bot_thread = threading.Thread(target=run_bot, daemon=True)
-    bot_thread.start()
-
-    # Render.com থেকে PORT এনভায়রনমেন্ট ভেরিয়েবলটি পান।
-    port = int(os.environ.get("PORT", 5000))
+    logging.info("Application starting...")
     
-    print(f"Starting Flask web server on port {port}...")
-    # Flask অ্যাপ্লিকেশন চালান।
-    web_app.run(host='0.0.0.0', port=port)
+    # Pyrogram বটকে একটি পৃথক থ্রেডে চালান
+    import threading
+    bot_thread = threading.Thread(target=start_bot_sync, daemon=True)
+    bot_thread.start()
+    logging.info("Pyrogram bot thread started.")
+
+    # Flask অ্যাপ্লিকেশন চালান
+    logging.info(f"Starting Flask web server on port {PORT}...")
+    web_app.run(host='0.0.0.0', port=PORT)
+    logging.info("Flask web server stopped.")
 
