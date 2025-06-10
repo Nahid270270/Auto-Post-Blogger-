@@ -1,9 +1,9 @@
 from pyrogram import Client, filters
 import requests
-from flask import Flask, request # Flask ইম্পোর্ট করা হয়েছে
+from flask import Flask, request
 import os
 import threading
-import asyncio # asyncio ইম্পোর্ট করা হয়েছে
+# import asyncio # asyncio এখানে সরাসরি প্রয়োজন নেই, Pyrogram নিজেই হ্যান্ডেল করবে
 
 API_ID = 22697010     # আপনার API_ID
 API_HASH = "fd88d7339b0371eb2a9501d523f3e2a7"
@@ -67,7 +67,6 @@ async def movie_handler(client, message):
 
     html_code = generate_html(data, link1, link2)
     await message.reply("✅ Here is your Blogger HTML Code:\n\n`Copy this and paste into Blogger HTML mode.`", quote=True)
-    # HTML কোডটি `<code>` ট্যাগের মধ্যে পাঠানো হয়েছে যাতে এটি সঠিকভাবে দেখা যায়
     await message.reply(f"<code>{html_code}</code>", parse_mode="html")
 
 # Flask রুট যা বটকে সক্রিয় রাখবে এবং পোর্ট বাইন্ডিং নিশ্চিত করবে
@@ -75,26 +74,21 @@ async def movie_handler(client, message):
 def home():
     return "Bot is running and listening!"
 
-# Pyrogram বট চালানোর জন্য একটি ফাংশন
+# Pyrogram বট চালানোর জন্য একটি ফাংশন (সংশোধিত)
 def run_bot():
     print("Starting Pyrogram bot...")
-    # Pyrogram অ্যাপ্লিকেশন রান করা হচ্ছে
-    # Pyrogram এর run() মেথড async; তাই এটি একটি ইভেন্ট লুপে চলতে হবে।
-    # আমরা এটি একটি পৃথক থ্রেডে async করে চালাব।
-    asyncio.run(app.run())
+    app.run() # asyncio.run() বাদ দেওয়া হয়েছে, কারণ app.run() নিজেই লুপ হ্যান্ডেল করে
     print("Pyrogram bot stopped.")
 
 if __name__ == '__main__':
     # Pyrogram বটকে একটি পৃথক থ্রেডে চালান
-    # daemon=True সেট করা হয়েছে যাতে মূল প্রোগ্রাম বন্ধ হলে থ্রেডটিও বন্ধ হয়ে যায়।
     bot_thread = threading.Thread(target=run_bot, daemon=True)
     bot_thread.start()
 
     # Render.com থেকে PORT এনভায়রনমেন্ট ভেরিয়েবলটি পান।
-    # যদি PORT সেট করা না থাকে, তাহলে ডিফল্ট 5000 ব্যবহার করুন।
     port = int(os.environ.get("PORT", 5000))
     
     print(f"Starting Flask web server on port {port}...")
     # Flask অ্যাপ্লিকেশন চালান।
-    # host='0.0.0.0' সেট করা হয়েছে যাতে এটি যেকোনো IP অ্যাড্রেস থেকে অ্যাক্সেস করা যায়।
     web_app.run(host='0.0.0.0', port=port)
+
