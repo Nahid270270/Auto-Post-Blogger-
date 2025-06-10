@@ -4,7 +4,7 @@ import requests
 API_ID = 22697010     # তোমার API_ID
 API_HASH = "fd88d7339b0371eb2a9501d523f3e2a7"
 BOT_TOKEN = "7347631253:AAFVbAQhRkv7XHcy-u838xGy49unjqw8RKE"
-OMDB_API_KEY = "your_omdb_api_key"
+OMDB_API_KEY = "58dcfd4d"
 
 app = Client("movie_poster_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
