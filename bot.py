@@ -1,13 +1,19 @@
 from pyrogram import Client, filters
 import requests
+from flask import Flask, request # Flask ইম্পোর্ট করুন
 
-API_ID = 22697010     # তোমার API_ID
+# আপনার বিদ্যমান Pyrogram কোড...
+API_ID = 22697010
 API_HASH = "fd88d7339b0371eb2a9501d523f3e2a7"
 BOT_TOKEN = "7347631253:AAFVbAQhRkv7XHcy-u838xGy49unjqw8RKE"
 OMDB_API_KEY = "58dcfd4d"
 
 app = Client("movie_poster_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
+# Flask অ্যাপ্লিকেশন তৈরি করুন
+web_app = Flask(__name__)
+
+# আপনার Pyrogram হ্যান্ডলারগুলো এখানে থাকবে...
 def get_movie_data(title):
     url = f"http://www.omdbapi.com/?t={title}&apikey={OMDB_API_KEY}"
     res = requests.get(url).json()
@@ -57,4 +63,18 @@ async def movie_handler(client, message):
     await message.reply("✅ Here is your Blogger HTML Code:\n\n`Copy this and paste into Blogger HTML mode.`", quote=True)
     await message.reply(f"<code>{html_code}</code>", parse_mode="html")
 
-app.run()
+# Flask রুট যা বটকে সক্রিয় রাখবে এবং পোর্ট বাইন্ডিং নিশ্চিত করবে
+@web_app.route('/')
+def home():
+    return "Bot is running!"
+
+if __name__ == '__main__':
+    import os
+    port = int(os.environ.get("PORT", 5000)) # Render এই PORT এনভায়রনমেন্ট ভেরিয়েবলটি দেয়
+    
+    # Pyrogram বটকে পৃথক থ্রেডে চালান
+    import threading
+    threading.Thread(target=app.run, daemon=True).start()
+
+    # Flask অ্যাপ চালান
+    web_app.run(host='0.0.0.0', port=port)
