@@ -692,7 +692,6 @@ index_html = """
 
 
 # --- START OF detail_html TEMPLATE ---
-# (আপনার detail_html কোড এখানে থাকবে, যা আগের মতো)
 detail_html = """
 <!DOCTYPE html>
 <html lang="en">
@@ -1001,18 +1000,41 @@ detail_html = """
     </div>
     
     <div class="download-section">
-      <h3>Download Links</h3>
-      {% if movie.links and movie.links|length > 0 %}
-        {% for link_item in movie.links %}
-        <div class="download-item">
-          <p class="download-quality-info">({{ link_item.quality }}) [{{ link_item.size }}]</p>
-          <div class="download-button-wrapper">
-            <a class="download-button" href="{{ link_item.url }}" target="_blank" rel="noopener">Download</a>
+      {% if movie.type == 'movie' %}
+        <h3>Download Links</h3>
+        {% if movie.links and movie.links|length > 0 %}
+          {% for link_item in movie.links %}
+          <div class="download-item">
+            <p class="download-quality-info">({{ link_item.quality }}) [{{ link_item.size }}]</p>
+            <div class="download-button-wrapper">
+              <a class="download-button" href="{{ link_item.url }}" target="_blank" rel="noopener">Download</a>
+            </div>
           </div>
+          {% endfor %}
+        {% else %}
+          <p class="no-link-message">No download links available yet.</p>
+        {% endif %}
+      {% elif movie.type == 'series' and movie.episodes and movie.episodes|length > 0 %}
+        <h3>Episodes</h3>
+        {% for episode in movie.episodes | sort(attribute='episode_number') %}
+        <div class="download-item" style="border-top: 1px solid #333; padding-top: 15px; margin-top: 15px;">
+          <h4 style="color: #1db954; font-size: 20px; margin-bottom: 10px;">Episode {{ episode.episode_number }}: {{ episode.title }}</h4>
+          {% if episode.overview %}
+            <p style="color: #ccc; font-size: 15px; margin-bottom: 10px;">{{ episode.overview }}</p>
+          {% endif %}
+          {% if episode.links and episode.links|length > 0 %}
+            {% for link_item in episode.links %}
+            <div class="download-button-wrapper" style="margin-bottom: 10px;">
+              <a class="download-button" href="{{ link_item.url }}" target="_blank" rel="noopener">Download ({{ link_item.quality }}) [{{ link_item.size }}]</a>
+            </div>
+            {% endfor %}
+          {% else %}
+            <p class="no-link-message" style="margin-top: 0; padding: 0; background: none;">No download links for this episode.</p>
+          {% endif %}
         </div>
         {% endfor %}
       {% else %}
-        <p class="no-link-message">No download links available yet.</p>
+        <p class="no-link-message">No download links or episodes available yet for this content type.</p>
       {% endif %}
     </div>
 
@@ -1050,7 +1072,6 @@ detail_html = """
 
 
 # --- START OF admin_html TEMPLATE ---
-# (আপনার admin_html কোড এখানে থাকবে, যা আগের মতো)
 admin_html = """
 <!DOCTYPE html>
 <html>
@@ -1084,7 +1105,7 @@ admin_html = """
         font-weight: bold;
         color: #ddd;
     }
-    input[type="text"], input[type="url"], textarea, button, select { /* Added select for dropdown */
+    input[type="text"], input[type="url"], textarea, button, select, input[type="number"] { /* Added select for dropdown */
       width: 100%;
       padding: 10px;
       margin-bottom: 15px;
@@ -1193,13 +1214,13 @@ admin_html = """
 
     <div class="form-group">
         <label for="content_type">Content Type:</label>
-        <select name="content_type" id="content_type">
+        <select name="content_type" id="content_type" onchange="toggleEpisodeFields()">
             <option value="movie">Movie</option>
             <option value="series">TV Series / Web Series</option>
         </select>
     </div>
 
-    <div class="form-group">
+    <div class="form-group" id="movie_download_links_group"> {# Group for movie links #}
         <label>Download Links (only paste URL):</label>
         <div class="link-input-group">
             <p>480p Download Link [Approx. 590MB]:</p>
@@ -1214,6 +1235,15 @@ admin_html = """
             <input type="url" name="link_1080p" placeholder="Enter 1080p download link" />
         </div>
     </div>
+
+    <div id="episode_fields" style="display: none;"> {# Initially hidden for series episodes #}
+        <h3>Episodes</h3>
+        <div id="episodes_container">
+            {# Episodes will be dynamically added here by JavaScript #}
+        </div>
+        <button type="button" onclick="addEpisodeField()">Add New Episode</button>
+    </div>
+
 
     <div class="form-group">
         <label for="quality">Quality Tag (e.g., HD, Hindi Dubbed):</label>
@@ -1306,6 +1336,74 @@ admin_html = """
         window.location.href = '/delete_movie/' + movieId;
       }
     }
+
+    function toggleEpisodeFields() {
+        var contentType = document.getElementById('content_type').value;
+        var episodeFields = document.getElementById('episode_fields');
+        var movieDownloadLinksGroup = document.getElementById('movie_download_links_group');
+        
+        if (contentType === 'series') {
+            episodeFields.style.display = 'block';
+            if (movieDownloadLinksGroup) {
+                movieDownloadLinksGroup.style.display = 'none';
+            }
+        } else {
+            episodeFields.style.display = 'none';
+            if (movieDownloadLinksGroup) {
+                movieDownloadLinksGroup.style.display = 'block';
+            }
+        }
+    }
+
+    function addEpisodeField(episode = {}) {
+        const container = document.getElementById('episodes_container');
+        const newEpisodeDiv = document.createElement('div');
+        newEpisodeDiv.className = 'episode-item';
+        newEpisodeDiv.style.cssText = 'border: 1px solid #444; padding: 10px; margin-bottom: 10px; border-radius: 5px;';
+        
+        const episodeNumber = episode.episode_number || '';
+        const episodeTitle = episode.title || '';
+        const episodeOverview = episode.overview || '';
+        const link480p = (episode.links && episode.links.find(l => l.quality === '480p')) ? episode.links.find(l => l.quality === '480p').url : '';
+        const link720p = (episode.links && episode.links.find(l => l.quality === '720p')) ? episode.links.find(l => l.quality === '720p').url : '';
+        const link1080p = (episode.links && episode.links.find(l => l.quality === '1080p')) ? episode.links.find(l => l.quality === '1080p').url : '';
+
+        newEpisodeDiv.innerHTML = `
+            <div class="form-group">
+                <label>Episode Number:</label>
+                <input type="number" name="episode_number[]" value="${episodeNumber}" required />
+            </div>
+            <div class="form-group">
+                <label>Episode Title:</label>
+                <input type="text" name="episode_title[]" value="${episodeTitle}" placeholder="e.g., Episode 1: The Beginning" required />
+            </div>
+            <div class="form-group">
+                <label>Episode Overview (Optional):</label>
+                <textarea name="episode_overview[]" rows="3" placeholder="Overview for this episode">${episodeOverview}</textarea>
+            </div>
+            <div class="link-input-group">
+                <p>480p Link:</p>
+                <input type="url" name="episode_link_480p[]" value="${link480p}" placeholder="Enter 480p download link" />
+            </div>
+            <div class="link-input-group">
+                <p>720p Link:</p>
+                <input type="url" name="episode_link_720p[]" value="${link720p}" placeholder="Enter 720p download link" />
+            </div>
+            <div class="link-input-group">
+                <p>1080p Link:</p>
+                <input type="url" name="episode_link_1080p[]" value="${link1080p}" placeholder="Enter 1080p download link" />
+            </div>
+            <button type="button" onclick="removeEpisode(this)" class="delete-btn" style="background: #e44d26;">Remove Episode</button>
+        `;
+        container.appendChild(newEpisodeDiv);
+    }
+
+    function removeEpisode(button) {
+        button.closest('.episode-item').remove();
+    }
+
+    // Call on page load to set initial state
+    document.addEventListener('DOMContentLoaded', toggleEpisodeFields);
   </script>
 </body>
 </html>
@@ -1314,7 +1412,6 @@ admin_html = """
 
 
 # --- START OF edit_html TEMPLATE ---
-# (আপনার edit_html কোড এখানে থাকবে, যা আগের মতো)
 edit_html = """
 <!DOCTYPE html>
 <html>
@@ -1348,7 +1445,7 @@ edit_html = """
         font-weight: bold;
         color: #ddd;
     }
-    input[type="text"], input[type="url"], textarea, button, select {
+    input[type="text"], input[type="url"], textarea, button, select, input[type="number"] {
       width: 100%;
       padding: 10px;
       margin-bottom: 15px;
@@ -1408,13 +1505,13 @@ edit_html = """
 
     <div class="form-group">
         <label for="content_type">Content Type:</label>
-        <select name="content_type" id="content_type">
+        <select name="content_type" id="content_type" onchange="toggleEpisodeFields()">
             <option value="movie" {% if movie.type == 'movie' %}selected{% endif %}>Movie</option>
             <option value="series" {% if movie.type == 'series' %}selected{% endif %}>TV Series / Web Series</option>
         </select>
     </div>
 
-    <div class="form-group">
+    <div class="form-group" id="movie_download_links_group"> {# Group for movie links #}
         <label>Download Links (only paste URL):</label>
         <div class="link-input-group">
             <p>480p Download Link [Approx. 590MB]:</p>
@@ -1429,6 +1526,46 @@ edit_html = """
             <input type="url" name="link_1080p" placeholder="Enter 1080p download link" value="{% for link in movie.links %}{% if link.quality == '1080p' %}{{ link.url }}{% endif %}{% endfor %}" />
         </div>
     </div>
+
+    <div id="episode_fields" style="display: none;"> {# Initially hidden for series episodes #}
+        <h3>Episodes</h3>
+        <div id="episodes_container">
+            {# Existing episodes will be loaded here in edit mode #}
+            {% if movie.type == 'series' and movie.episodes %}
+                {% for episode in movie.episodes %}
+                    <div class="episode-item" style="border: 1px solid #444; padding: 10px; margin-bottom: 10px; border-radius: 5px;">
+                        <div class="form-group">
+                            <label>Episode Number:</label>
+                            <input type="number" name="episode_number[]" value="{{ episode.episode_number }}" required />
+                        </div>
+                        <div class="form-group">
+                            <label>Episode Title:</label>
+                            <input type="text" name="episode_title[]" value="{{ episode.title }}" placeholder="e.g., Episode 1: The Beginning" required />
+                        </div>
+                        <div class="form-group">
+                            <label>Episode Overview (Optional):</label>
+                            <textarea name="episode_overview[]" rows="3" placeholder="Overview for this episode">{{ episode.overview }}</textarea>
+                        </div>
+                        <div class="link-input-group">
+                            <p>480p Link:</p>
+                            <input type="url" name="episode_link_480p[]" value="{% for link in episode.links %}{% if link.quality == '480p' %}{{ link.url }}{% endif %}{% endfor %}" placeholder="Enter 480p download link" />
+                        </div>
+                        <div class="link-input-group">
+                            <p>720p Link:</p>
+                            <input type="url" name="episode_link_720p[]" value="{% for link in episode.links %}{% if link.quality == '720p' %}{{ link.url }}{% endif %}{% endfor %}" placeholder="Enter 720p download link" />
+                        </div>
+                        <div class="link-input-group">
+                            <p>1080p Link:</p>
+                            <input type="url" name="episode_link_1080p[]" value="{% for link in episode.links %}{% if link.quality == '1080p' %}{{ link.url }}{% endif %}{% endfor %}" placeholder="Enter 1080p download link" />
+                        </div>
+                        <button type="button" onclick="removeEpisode(this)" class="delete-btn" style="background: #e44d26;">Remove Episode</button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        </div>
+        <button type="button" onclick="addEpisodeField()">Add New Episode</button>
+    </div>
+
 
     <div class="form-group">
         <label for="quality">Quality Tag (e.g., HD, Hindi Dubbed):</label>
@@ -1477,6 +1614,84 @@ edit_html = """
     
     <button type="submit">Update Content</button>
   </form>
+  <script>
+    function toggleEpisodeFields() {
+        var contentType = document.getElementById('content_type').value;
+        var episodeFields = document.getElementById('episode_fields');
+        var movieDownloadLinksGroup = document.getElementById('movie_download_links_group');
+        
+        if (contentType === 'series') {
+            episodeFields.style.display = 'block';
+            if (movieDownloadLinksGroup) {
+                movieDownloadLinksGroup.style.display = 'none';
+            }
+        } else {
+            episodeFields.style.display = 'none';
+            if (movieDownloadLinksGroup) {
+                movieDownloadLinksGroup.style.display = 'block';
+            }
+        }
+    }
+
+    function addEpisodeField(episode = {}) {
+        const container = document.getElementById('episodes_container');
+        const newEpisodeDiv = document.createElement('div');
+        newEpisodeDiv.className = 'episode-item';
+        newEpisodeDiv.style.cssText = 'border: 1px solid #444; padding: 10px; margin-bottom: 10px; border-radius: 5px;';
+        
+        const episodeNumber = episode.episode_number || '';
+        const episodeTitle = episode.title || '';
+        const episodeOverview = episode.overview || '';
+        const link480p = (episode.links && episode.links.find(l => l.quality === '480p')) ? episode.links.find(l => l.quality === '480p').url : '';
+        const link720p = (episode.links && episode.links.find(l => l.quality === '720p')) ? episode.links.find(l => l.quality === '720p').url : '';
+        const link1080p = (episode.links && episode.links.find(l => l.quality === '1080p')) ? episode.links.find(l => l.quality === '1080p').url : '';
+
+        newEpisodeDiv.innerHTML = `
+            <div class="form-group">
+                <label>Episode Number:</label>
+                <input type="number" name="episode_number[]" value="${episodeNumber}" required />
+            </div>
+            <div class="form-group">
+                <label>Episode Title:</label>
+                <input type="text" name="episode_title[]" value="${episodeTitle}" placeholder="e.g., Episode 1: The Beginning" required />
+            </div>
+            <div class="form-group">
+                <label>Episode Overview (Optional):</label>
+                <textarea name="episode_overview[]" rows="3" placeholder="Overview for this episode">${episodeOverview}</textarea>
+            </div>
+            <div class="link-input-group">
+                <p>480p Link:</p>
+                <input type="url" name="episode_link_480p[]" value="${link480p}" placeholder="Enter 480p download link" />
+            </div>
+            <div class="link-input-group">
+                <p>720p Link:</p>
+                <input type="url" name="episode_link_720p[]" value="${link720p}" placeholder="Enter 720p download link" />
+            </div>
+            <div class="link-input-group">
+                <p>1080p Link:</p>
+                <input type="url" name="episode_link_1080p[]" value="${link1080p}" placeholder="Enter 1080p download link" />
+            </div>
+            <button type="button" onclick="removeEpisode(this)" class="delete-btn" style="background: #e44d26;">Remove Episode</button>
+        `;
+        container.appendChild(newEpisodeDiv);
+    }
+
+    function removeEpisode(button) {
+        button.closest('.episode-item').remove();
+    }
+
+    // Call on page load to set initial state based on current movie type
+    document.addEventListener('DOMContentLoaded', function() {
+        toggleEpisodeFields(); // Set initial visibility
+        // If it's an edit page for a series, ensure episode fields are visible and loaded
+        var movieType = document.getElementById('content_type').value;
+        if (movieType === 'series' && typeof movie !== 'undefined' && movie.episodes) {
+             // Episodes are already loaded by Jinja in the template, no need to add dynamically
+             // unless we want to allow adding *new* empty fields on load for a fresh series.
+             // For existing series, the current setup where Jinja renders them is fine.
+        }
+    });
+  </script>
 </body>
 </html>
 """
@@ -1551,7 +1766,8 @@ def movie_detail(movie_id):
             
             # Fetch additional details from TMDb if API key is available
             # Only fetch if tmdb_id is not already present or if the existing poster/overview are default values.
-            should_fetch_tmdb = TMDB_API_KEY and (not movie.get("tmdb_id") or movie.get("overview") == "No overview available." or not movie.get("poster"))
+            # AND if it's a movie (TMDb episode details are more complex)
+            should_fetch_tmdb = TMDB_API_KEY and (not movie.get("tmdb_id") or movie.get("overview") == "No overview available." or not movie.get("poster")) and movie.get("type") == "movie"
 
             if should_fetch_tmdb:
                 tmdb_id = movie.get("tmdb_id") 
@@ -1559,7 +1775,7 @@ def movie_detail(movie_id):
                 # If TMDb ID is not stored, search by title first
                 if not tmdb_id:
                     # Decide whether to search as movie or tv based on 'type' field
-                    tmdb_search_type = "movie" if movie.get("type") == "movie" else "tv"
+                    tmdb_search_type = "movie" if movie.get("type") == "movie" else "tv" # Will only be 'movie' due to should_fetch_tmdb
                     search_url = f"https://api.themoviedb.org/3/search/{tmdb_search_type}?api_key={TMDB_API_KEY}&query={movie['title']}"
                     try:
                         search_res = requests.get(search_url, timeout=5).json()
@@ -1579,7 +1795,7 @@ def movie_detail(movie_id):
 
                 # If TMDb ID is found (either from DB or search), fetch full details
                 if tmdb_id:
-                    tmdb_detail_type = "movie" if movie.get("type") == "movie" else "tv"
+                    tmdb_detail_type = "movie" # Always movie if should_fetch_tmdb is true
                     tmdb_detail_url = f"https://api.themoviedb.org/3/{tmdb_detail_type}/{tmdb_id}?api_key={TMDB_API_KEY}"
                     try:
                         res = requests.get(tmdb_detail_url, timeout=5).json()
@@ -1590,7 +1806,7 @@ def movie_detail(movie_id):
                             if not movie.get("poster") and res.get("poster_path"):
                                 movie["poster"] = f"https://image.tmdb.org/t/p/w500{res['poster_path']}"
                             
-                            release_date = res.get("release_date") if tmdb_detail_type == "movie" else res.get("first_air_date") # For series
+                            release_date = res.get("release_date") # For movies
                             if movie.get("year") == "N/A" and release_date:
                                 movie["year"] = release_date[:4]
                                 movie["release_date"] = release_date
@@ -1624,7 +1840,7 @@ def movie_detail(movie_id):
                 else:
                     print(f"TMDb ID not found for movie '{movie.get('title', movie_id)}'. Skipping TMDb detail fetch.")
             else:
-                print("Skipping TMDb API call for movie details (no key, or data already present).")
+                print("Skipping TMDb API call for movie details (not a movie, no key, or data already present).")
 
         return render_template_string(detail_html, movie=movie)
     except Exception as e:
@@ -1637,21 +1853,6 @@ def admin():
         title = request.form.get("title")
         content_type = request.form.get("content_type", "movie") # New: 'movie' or 'series'
         quality_tag = request.form.get("quality", "").upper()
-        
-        # Collect links from individual input fields
-        links_list = []
-        
-        link_480p = request.form.get("link_480p")
-        if link_480p:
-            links_list.append({"quality": "480p", "size": "590MB", "url": link_480p})
-            
-        link_720p = request.form.get("link_720p")
-        if link_720p:
-            links_list.append({"quality": "720p", "size": "1.4GB", "url": link_720p})
-            
-        link_1080p = request.form.get("link_1080p")
-        if link_1080p:
-            links_list.append({"quality": "1080p", "size": "2.9GB", "url": link_1080p})
         
         # Get manual inputs
         manual_overview = request.form.get("overview")
@@ -1672,7 +1873,6 @@ def admin():
 
         movie_data = {
             "title": title,
-            "links": links_list,
             "quality": quality_tag,
             "type": content_type, # Use selected content type
             "overview": manual_overview if manual_overview else "No overview available.",
@@ -1687,10 +1887,49 @@ def admin():
             "is_coming_soon": is_coming_soon # Store coming soon status
         }
 
+        # Handle download links based on content type
+        if content_type == "movie":
+            links_list = []
+            link_480p = request.form.get("link_480p")
+            if link_480p:
+                links_list.append({"quality": "480p", "size": "590MB", "url": link_480p})
+            link_720p = request.form.get("link_720p")
+            if link_720p:
+                links_list.append({"quality": "720p", "size": "1.4GB", "url": link_720p})
+            link_1080p = request.form.get("link_1080p")
+            if link_1080p:
+                links_list.append({"quality": "1080p", "size": "2.9GB", "url": link_1080p})
+            movie_data["links"] = links_list
+        else: # content_type == "series"
+            episodes_list = []
+            episode_numbers = request.form.getlist('episode_number[]')
+            episode_titles = request.form.getlist('episode_title[]')
+            episode_overviews = request.form.getlist('episode_overview[]')
+            episode_link_480ps = request.form.getlist('episode_link_480p[]')
+            episode_link_720ps = request.form.getlist('episode_link_720p[]')
+            episode_link_1080ps = request.form.getlist('episode_link_1080p[]')
+
+            for i in range(len(episode_numbers)):
+                episode_links = []
+                if episode_link_480ps and episode_link_480ps[i]:
+                    episode_links.append({"quality": "480p", "size": "590MB", "url": episode_link_480ps[i]})
+                if episode_link_720ps and episode_link_720ps[i]:
+                    episode_links.append({"quality": "720p", "size": "1.4GB", "url": episode_link_720ps[i]})
+                if episode_link_1080ps and episode_link_1080ps[i]:
+                    episode_links.append({"quality": "1080p", "size": "2.9GB", "url": episode_link_1080ps[i]})
+                
+                episodes_list.append({
+                    "episode_number": int(episode_numbers[i]) if episode_numbers[i] else 0,
+                    "title": episode_titles[i] if episode_titles else "",
+                    "overview": episode_overviews[i] if episode_overviews else "",
+                    "links": episode_links
+                })
+            movie_data["episodes"] = episodes_list
+
         # Try to fetch from TMDb only if no manual poster or overview was provided
-        if TMDB_API_KEY and (not manual_poster_url and not manual_overview or movie_data["overview"] == "No overview available." or not movie_data["poster"]):
-            tmdb_search_type = "movie" if content_type == "movie" else "tv"
-            tmdb_url = f"https://api.themoviedb.org/3/search/{tmdb_search_type}?api_key={TMDB_API_KEY}&query={title}"
+        # And if it's a movie, TMDb series episode fetching is more complex and not implemented here
+        if TMDB_API_KEY and content_type == "movie" and (not manual_poster_url and not manual_overview or movie_data["overview"] == "No overview available." or not movie_data["poster"]):
+            tmdb_url = f"https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={title}"
             try:
                 res = requests.get(tmdb_url, timeout=5).json()
                 if res and "results" in res and res["results"]:
@@ -1701,7 +1940,7 @@ def admin():
                     if not manual_poster_url and data.get("poster_path"):
                         movie_data["poster"] = f"https://image.tmdb.org/t/p/w500{data['poster_path']}"
                     
-                    release_date = data.get("release_date") if tmdb_search_type == "movie" else data.get("first_air_date")
+                    release_date = data.get("release_date")
                     if not manual_year and release_date:
                         movie_data["year"] = release_date[:4]
                         movie_data["release_date"] = release_date
@@ -1719,13 +1958,13 @@ def admin():
                     
                     movie_data["tmdb_id"] = data.get("id")
                 else:
-                    print(f"No results found on TMDb for title: {title} ({tmdb_search_type})")
+                    print(f"No results found on TMDb for title: {title} (movie)")
             except requests.exceptions.RequestException as e:
                 print(f"Error connecting to TMDb API for '{title}': {e}")
             except Exception as e:
                 print(f"An unexpected error occurred while fetching TMDb data: {e}")
         else:
-            print("Skipping TMDb API call (no key, or manual poster/overview provided, or data already present).")
+            print("Skipping TMDb API call (not a movie, no key, or manual poster/overview provided).")
 
         try:
             movies.insert_one(movie_data)
@@ -1755,17 +1994,6 @@ def edit_movie(movie_id):
             content_type = request.form.get("content_type", "movie")
             quality_tag = request.form.get("quality", "").upper()
             
-            links_list = []
-            link_480p = request.form.get("link_480p")
-            if link_480p:
-                links_list.append({"quality": "480p", "size": "590MB", "url": link_480p})
-            link_720p = request.form.get("link_720p")
-            if link_720p:
-                links_list.append({"quality": "720p", "size": "1.4GB", "url": link_720p})
-            link_1080p = request.form.get("link_1080p")
-            if link_1080p:
-                links_list.append({"quality": "1080p", "size": "2.9GB", "url": link_1080p})
-            
             manual_overview = request.form.get("overview")
             manual_poster_url = request.form.get("poster_url")
             manual_year = request.form.get("year")
@@ -1783,7 +2011,6 @@ def edit_movie(movie_id):
             # Prepare updated data for MongoDB
             updated_data = {
                 "title": title,
-                "links": links_list,
                 "quality": quality_tag,
                 "type": content_type,
                 "overview": manual_overview if manual_overview else "No overview available.",
@@ -1796,10 +2023,56 @@ def edit_movie(movie_id):
                 "is_coming_soon": is_coming_soon
             }
 
+            # Handle download links based on content type
+            if content_type == "movie":
+                links_list = []
+                link_480p = request.form.get("link_480p")
+                if link_480p:
+                    links_list.append({"quality": "480p", "size": "590MB", "url": link_480p})
+                link_720p = request.form.get("link_720p")
+                if link_720p:
+                    links_list.append({"quality": "720p", "size": "1.4GB", "url": link_720p})
+                link_1080p = request.form.get("link_1080p")
+                if link_1080p:
+                    links_list.append({"quality": "1080p", "size": "2.9GB", "url": link_1080p})
+                updated_data["links"] = links_list
+                # Remove episodes if present for a movie
+                if "episodes" in movie:
+                    movies.update_one({"_id": ObjectId(movie_id)}, {"$unset": {"episodes": ""}})
+            else: # content_type == "series"
+                episodes_list = []
+                episode_numbers = request.form.getlist('episode_number[]')
+                episode_titles = request.form.getlist('episode_title[]')
+                episode_overviews = request.form.getlist('episode_overview[]')
+                episode_link_480ps = request.form.getlist('episode_link_480p[]')
+                episode_link_720ps = request.form.getlist('episode_link_720p[]')
+                episode_link_1080ps = request.form.getlist('episode_link_1080p[]')
+
+                for i in range(len(episode_numbers)):
+                    episode_links = []
+                    if episode_link_480ps and episode_link_480ps[i]:
+                        episode_links.append({"quality": "480p", "size": "590MB", "url": episode_link_480ps[i]})
+                    if episode_link_720ps and episode_link_720ps[i]:
+                        episode_links.append({"quality": "720p", "size": "1.4GB", "url": episode_link_720ps[i]})
+                    if episode_link_1080ps and episode_link_1080ps[i]:
+                        episode_links.append({"quality": "1080p", "size": "2.9GB", "url": episode_link_1080ps[i]})
+                    
+                    episodes_list.append({
+                        "episode_number": int(episode_numbers[i]) if episode_numbers[i] else 0,
+                        "title": episode_titles[i] if episode_titles else "",
+                        "overview": episode_overviews[i] if episode_overviews else "",
+                        "links": episode_links
+                    })
+                updated_data["episodes"] = episodes_list
+                # Remove top-level 'links' if present for series
+                if "links" in movie:
+                    movies.update_one({"_id": ObjectId(movie_id)}, {"$unset": {"links": ""}})
+
+
             # If TMDb API Key is available and no manual overview/poster provided, fetch and update
-            if TMDB_API_KEY and (not manual_poster_url and not manual_overview): # Only try to fetch if not manually overridden
-                tmdb_search_type = "movie" if content_type == "movie" else "tv"
-                tmdb_url = f"https://api.themoviedb.org/3/search/{tmdb_search_type}?api_key={TMDB_API_KEY}&query={title}"
+            # Only for movies, as TMDb episode details are more complex
+            if TMDB_API_KEY and content_type == "movie" and (not manual_poster_url and not manual_overview): # Only try to fetch if not manually overridden
+                tmdb_url = f"https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={title}"
                 try:
                     res = requests.get(tmdb_url, timeout=5).json()
                     if res and "results" in res and res["results"]:
@@ -1810,7 +2083,7 @@ def edit_movie(movie_id):
                         if not manual_poster_url and data.get("poster_path"):
                             updated_data["poster"] = f"https://image.tmdb.org/t/p/w500{data['poster_path']}"
                         
-                        release_date = data.get("release_date") if tmdb_search_type == "movie" else data.get("first_air_date")
+                        release_date = data.get("release_date")
                         if not manual_year and release_date:
                             updated_data["year"] = release_date[:4]
                             updated_data["release_date"] = release_date
@@ -1828,11 +2101,13 @@ def edit_movie(movie_id):
                         
                         updated_data["tmdb_id"] = data.get("id")
                     else:
-                        print(f"No results found on TMDb for title: {title} ({tmdb_search_type}) during edit.")
+                        print(f"No results found on TMDb for title: {title} (movie) during edit.")
                 except requests.exceptions.RequestException as e:
                     print(f"Error connecting to TMDb API for '{title}' during edit: {e}")
                 except Exception as e:
                     print(f"An unexpected error occurred while fetching TMDb data during edit: {e}")
+            else:
+                print("Skipping TMDb API call (not a movie, no key, or manual poster/overview provided).")
             
             # Update the movie in MongoDB
             movies.update_one({"_id": ObjectId(movie_id)}, {"$set": updated_data})
@@ -1900,4 +2175,3 @@ def coming_soon():
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000, debug=True)
-
