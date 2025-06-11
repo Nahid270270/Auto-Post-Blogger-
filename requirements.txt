@@ -2,3 +2,4 @@ flask
 pymongo
 requests
 jinja2
+python-dotenv
