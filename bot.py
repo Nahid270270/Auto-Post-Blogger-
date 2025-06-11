@@ -1,6 +1,6 @@
 from flask import Flask, render_template_string, request, redirect, url_for
 from pymongo import MongoClient
-from bson.objectid import ObjectId # Import ObjectId for querying by _id
+from bson.objectid import ObjectId
 import requests, os
 
 app = Flask(__name__)
@@ -21,21 +21,27 @@ try:
     client = MongoClient(MONGO_URI)
     db = client["movie_db"]
     movies = db["movies"]
-    # Optional: Create index for faster search if you use text search
-    # movies.create_index([("title", "text")], default_language='english')
     print("Successfully connected to MongoDB!")
 except Exception as e:
     print(f"Error connecting to MongoDB: {e}")
     exit(1)
 
-# --- index_html (remains unchanged) ---
+# TMDb Genre Map (for converting genre IDs to names)
+TMDb_Genre_Map = {
+    28: "Action", 12: "Adventure", 16: "Animation", 35: "Comedy", 80: "Crime",
+    99: "Documentary", 18: "Drama", 10402: "Music", 9648: "Mystery",
+    10749: "Romance", 878: "Science Fiction", 10770: "TV Movie", 53: "Thriller",
+    10752: "War", 37: "Western", 10751: "Family", 14: "Fantasy", 36: "History"
+}
+
+# --- FINAL index_html ---
 index_html = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>MovieZone</title>
+<title>Movie Dokan Style</title>
 <style>
   /* Reset & basics */
   * {
@@ -44,10 +50,10 @@ index_html = """
   body {
     margin: 0; background: #121212; color: #eee;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    -webkit-tap-highlight-color: transparent; /* Remove tap highlight on mobile */
+    -webkit-tap-highlight-color: transparent;
   }
   a { text-decoration: none; color: inherit; }
-  a:hover { color: #1db954; }
+  a:hover { color: #1db954; } /* Adjusted hover color */
   
   header {
     position: sticky;
@@ -105,7 +111,7 @@ index_html = """
 
   .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill,minmax(180px,1fr));
+    grid-template-columns: repeat(auto-fill,minmax(180px,1fr)); /* Default for larger screens */
     gap: 20px;
   }
   .movie-card {
@@ -113,22 +119,45 @@ index_html = """
     border-radius: 8px;
     overflow: hidden;
     box-shadow: 0 0 8px rgba(0,0,0,0.6);
-    transition: transform 0.2s ease;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
     position: relative;
     cursor: pointer;
+    /* Initial border for consistency */
+    border: 2px solid transparent; 
   }
+  /* RGB border animation on hover */
   .movie-card:hover {
     transform: scale(1.05);
-    box-shadow: 0 0 15px #1db954;
+    border: 2px solid; /* Use a solid border for the gradient */
+    border-image: linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet) 1;
+    animation: rgbBorder 3s linear infinite; /* Faster animation for hover */
+    box-shadow: 0 0 15px rgba(0,0,0,0.8); /* Maintain shadow on hover */
   }
+  @keyframes rgbBorder {
+    0% { border-image: linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet) 1; }
+    16% { border-image: linear-gradient(to right, orange, yellow, green, blue, indigo, violet, red) 1; }
+    33% { border-image: linear-gradient(to right, yellow, green, blue, indigo, violet, red, orange) 1; }
+    50% { border-image: linear-gradient(to right, green, blue, indigo, violet, red, orange, yellow) 1; }
+    66% { border-image: linear-gradient(to right, blue, indigo, violet, red, orange, yellow, green) 1; }
+    83% { border-image: linear-gradient(to right, indigo, violet, red, orange, yellow, green, blue) 1; }
+    100% { border-image: linear-gradient(to right, violet, red, orange, yellow, green, blue, indigo) 1; }
+  }
+
+
   .movie-poster {
     width: 100%;
-    height: 270px;
+    height: 270px; /* Default height for larger screens */
     object-fit: cover;
     display: block;
   }
   .movie-info {
     padding: 10px;
+    background: rgba(0, 0, 0, 0.7); /* Translucent background for text */
+    position: absolute; /* Position over the poster */
+    bottom: 0;
+    left: 0;
+    right: 0;
+    text-align: center; /* Center text */
   }
   .movie-title {
     font-size: 18px;
@@ -137,6 +166,7 @@ index_html = """
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    color: #fff; /* White title for contrast */
   }
   .movie-year {
     font-size: 14px;
@@ -187,11 +217,11 @@ index_html = """
     input[type="search"] { max-width: unset; font-size: 14px; padding: 6px 10px; }
     main { margin: 15px auto; padding: 0 10px; padding-bottom: 60px; }
     .trending-header { font-size: 18px; padding: 8px 10px; margin-bottom: 20px; }
-    .grid { grid-template-columns: repeat(auto-fill,minmax(100px,1fr)); gap: 10px; }
+    .grid { grid-template-columns: repeat(auto-fill,minmax(100px,1fr)); gap: 10px; } /* 3 columns on mobile */
     .movie-card { box-shadow: 0 0 5px rgba(0,0,0,0.5); }
     .movie-poster { height: 150px; }
-    .movie-info { padding: 8px; }
-    .movie-title { font-size: 13px; margin: 0 0 2px 0; }
+    .movie-info { padding: 8px; background: rgba(0, 0, 0, 0.7); }
+    .movie-title { font-size: 13px; margin: 0 0 2px 0; color: #fff; }
     .movie-year { font-size: 11px; margin-bottom: 4px; }
     .badge { font-size: 10px; padding: 1px 4px; top: 5px; left: 5px; }
   }
@@ -204,7 +234,7 @@ index_html = """
   }
   /* Mobile adjustments - END */
 
-  /* Optional: Bottom Navigation Bar styles (as seen in screenshot) */
+  /* Bottom Navigation Bar styles */
   .bottom-nav {
     position: fixed; bottom: 0; left: 0; right: 0;
     background: #181818; display: flex; justify-content: space-around;
@@ -284,7 +314,7 @@ index_html = """
 </html>
 """
 
-# --- Updated detail_html template ---
+# --- FINAL detail_html ---
 detail_html = """
 <!DOCTYPE html>
 <html lang="en">
@@ -310,7 +340,7 @@ detail_html = """
     background: linear-gradient(270deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #9400d3);
     background-size: 400% 400%; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     animation: gradientShift 10s ease infinite;
-    flex-grow: 1; /* Allow title to take available space */
+    flex-grow: 1;
     text-align: center;
   }
   @keyframes gradientShift {
@@ -319,37 +349,37 @@ detail_html = """
   .back-button {
       color: #1db954;
       font-size: 18px;
-      position: absolute; /* Position absolutely to allow h1 to center */
+      position: absolute;
       left: 20px;
-      z-index: 101; /* Ensure back button is above header h1 if overlapping */
+      z-index: 101;
   }
   .back-button i { margin-right: 5px; }
 
   /* Detail Page Specific Styles */
   .movie-detail-container {
-    max-width: 1000px; /* Wider container */
+    max-width: 1000px;
     margin: 20px auto;
     padding: 25px;
     background: #181818;
     border-radius: 8px;
     box-shadow: 0 0 15px rgba(0,0,0,0.7);
     display: flex;
-    flex-direction: column; /* Default for small screens */
-    gap: 25px; /* More space */
+    flex-direction: column;
+    gap: 25px;
   }
 
   .main-info {
       display: flex;
-      flex-direction: column; /* Stack poster and info on mobile */
+      flex-direction: column;
       gap: 25px;
   }
 
   .detail-poster-wrapper {
       position: relative;
       width: 100%;
-      max-width: 300px; /* Limit poster width */
-      flex-shrink: 0; /* Prevent poster from shrinking */
-      align-self: center; /* Center poster when stacked */
+      max-width: 300px;
+      flex-shrink: 0;
+      align-self: center;
   }
   .detail-poster {
     width: 100%;
@@ -365,16 +395,24 @@ detail_html = """
       font-size: 14px;
       padding: 4px 8px;
       border-radius: 5px;
+      background: #1db954; /* Consistent badge color */
+      color: #000;
+      font-weight: 700;
+      text-transform: uppercase;
+  }
+  .detail-poster-wrapper .badge.trending {
+    background: linear-gradient(45deg, #ff0077, #ff9900);
+    color: #fff;
   }
 
   .detail-info {
     flex-grow: 1;
   }
   .detail-title {
-    font-size: 38px; /* Larger title */
+    font-size: 38px;
     font-weight: 700;
     margin: 0 0 10px 0;
-    color: #eee; /* White title for better contrast */
+    color: #eee;
     text-shadow: 0 0 5px rgba(0,0,0,0.5);
   }
   .detail-meta {
@@ -396,26 +434,26 @@ detail_html = """
   }
 
   .detail-overview {
-    font-size: 17px; /* Slightly larger overview text */
+    font-size: 17px;
     line-height: 1.7;
     color: #ccc;
-    margin-bottom: 30px; /* More space below overview */
+    margin-bottom: 30px;
   }
 
   .action-buttons {
     display: flex;
-    gap: 20px; /* More space between buttons */
-    justify-content: center; /* Center buttons */
+    gap: 20px;
+    justify-content: center;
     flex-wrap: wrap;
-    margin-top: 20px; /* Ensure spacing from overview */
+    margin-top: 20px;
   }
   .action-button {
     flex: 1;
-    min-width: 200px; /* Wider buttons */
-    padding: 15px 20px; /* Larger padding */
+    min-width: 200px;
+    padding: 15px 20px;
     border-radius: 8px;
     text-align: center;
-    font-size: 20px; /* Larger font */
+    font-size: 20px;
     font-weight: 700;
     transition: background 0.3s ease;
   }
@@ -427,7 +465,7 @@ detail_html = """
     background: #17a34a;
   }
   .download-button {
-    background: #e44d26; /* Orange for download */
+    background: #e44d26;
     color: #fff;
   }
   .download-button:hover {
@@ -441,19 +479,19 @@ detail_html = """
   }
 
   /* Responsive Adjustments for Detail Page */
-  @media (min-width: 769px) { /* On larger screens, display side-by-side */
+  @media (min-width: 769px) {
       .main-info {
-          flex-direction: row; /* Poster and info side-by-side */
-          align-items: flex-start; /* Align to top */
+          flex-direction: row;
+          align-items: flex-start;
       }
       .detail-poster-wrapper {
-          margin-right: 40px; /* Space between poster and info */
+          margin-right: 40px;
       }
       .detail-title {
-          font-size: 44px; /* Even larger title on desktop */
+          font-size: 44px;
       }
       .action-buttons {
-          justify-content: flex-start; /* Align buttons to left on desktop */
+          justify-content: flex-start;
       }
   }
 
@@ -462,7 +500,7 @@ detail_html = """
     .back-button { font-size: 16px; left: 15px; }
     .movie-detail-container { padding: 15px; margin: 15px auto; gap: 15px; }
     .main-info { gap: 15px; }
-    .detail-poster-wrapper { max-width: 180px; } /* Smaller poster on mobile */
+    .detail-poster-wrapper { max-width: 180px; }
     .detail-poster-wrapper .badge { font-size: 12px; padding: 2px 6px; top: 8px; left: 8px; }
     .detail-title { font-size: 28px; }
     .detail-meta { font-size: 14px; gap: 10px; margin-bottom: 15px; }
@@ -474,7 +512,7 @@ detail_html = """
       .detail-title { font-size: 22px; }
       .detail-meta { font-size: 13px; }
       .detail-overview { font-size: 14px; }
-      .action-button { font-size: 14px; padding: 10px 12px; min-width: unset; flex: 1 1 45%; } /* Two columns on very small screens */
+      .action-button { font-size: 14px; padding: 10px 12px; min-width: unset; flex: 1 1 45%; }
   }
 
   /* Bottom nav for consistency (same as index_html) */
@@ -533,8 +571,6 @@ detail_html = """
     <div class="action-buttons">
       {% if movie.link %}
         <a class="action-button watch-button" href="{{ movie.link }}" target="_blank" rel="noopener">▶ Watch Now</a>
-        {# You can add a separate download link if your 'link' sometimes means download, or rename 'link' field in DB to 'watch_link' #}
-        {# Example: <a class="action-button download-button" href="{{ movie.download_link }}" target="_blank" rel="noopener">⇩ Download</a> #}
       {% else %}
         <p class="no-link-message">No watch/download link available yet.</p>
       {% endif %}
@@ -570,7 +606,7 @@ detail_html = """
 </html>
 """
 
-# --- admin_html (remains unchanged) ---
+# --- FINAL admin_html ---
 admin_html = """
 <!DOCTYPE html>
 <html>
@@ -579,13 +615,12 @@ admin_html = """
   <style>
     body { font-family: Arial, sans-serif; background: #121212; color: #eee; padding: 20px; }
     h2 { 
-      /* RGB Light Effect for Admin Title */
       background: linear-gradient(270deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #9400d3);
       background-size: 400% 400%;
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
-      animation: gradientShift 10s ease infinite; /* Slower animation */
-      display: inline-block; /* Required for background-clip: text to work on h2 */
+      animation: gradientShift 10s ease infinite;
+      display: inline-block;
       font-size: 28px;
     }
     @keyframes gradientShift {
@@ -650,35 +685,40 @@ def movie_detail(movie_id):
         if movie:
             movie['_id'] = str(movie['_id'])
             
-            # Fetch additional details from TMDb if not already stored
-            # Or always fetch fresh details for the detail page
             if TMDB_API_KEY:
-                # Use TMDb movie ID if available, otherwise search again
                 tmdb_id = movie.get("tmdb_id") 
                 if tmdb_id:
                     tmdb_url = f"https://api.themoviedb.org/3/movie/{tmdb_id}?api_key={TMDB_API_KEY}"
-                else: # Fallback: search by title if tmdb_id is not stored
+                else:
                     search_url = f"https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={movie['title']}"
                     search_res = requests.get(search_url, timeout=5).json()
                     if search_res and "results" in search_res and search_res["results"]:
                         tmdb_id = search_res["results"][0].get("id")
                         tmdb_url = f"https://api.themoviedb.org/3/movie/{tmdb_id}?api_key={TMDB_API_KEY}"
                     else:
-                        tmdb_url = None # No TMDb ID found
+                        tmdb_url = None
 
                 if tmdb_url:
                     try:
                         res = requests.get(tmdb_url, timeout=5).json()
                         if res:
-                            # Update movie object with more details from TMDb
                             movie["overview"] = res.get("overview", movie.get("overview", "No overview available."))
                             movie["poster"] = f"https://image.tmdb.org/t/p/w500{res['poster_path']}" if res.get("poster_path") else movie.get("poster", "")
                             movie["release_date"] = res.get("release_date", movie.get("year", "N/A"))
                             movie["vote_average"] = res.get("vote_average")
                             movie["original_language"] = res.get("original_language")
-                            movie["genres"] = [g["name"] for g in res.get("genres", [])]
-                            # Store the TMDb ID for future direct access
-                            movies.update_one({"_id": ObjectId(movie_id)}, {"$set": {"tmdb_id": tmdb_id}})
+                            # Convert genre IDs to names
+                            genres_names = []
+                            for genre_id in res.get("genres", []):
+                                if isinstance(genre_id, dict) and genre_id.get("id") in TMDb_Genre_Map:
+                                    genres_names.append(TMDb_Genre_Map[genre_id["id"]])
+                                elif isinstance(genre_id, int) and genre_id in TMDb_Genre_Map: # Fallback if only IDs are passed
+                                    genres_names.append(TMDb_Genre_Map[genre_id])
+                            movie["genres"] = genres_names
+                            
+                            # Store the TMDb ID if found and not already present
+                            if tmdb_id and not movie.get("tmdb_id"):
+                                movies.update_one({"_id": ObjectId(movie_id)}, {"$set": {"tmdb_id": tmdb_id}})
                     except requests.exceptions.RequestException as e:
                         print(f"Error connecting to TMDb API for detail '{movie_id}': {e}")
                     except Exception as e:
@@ -704,12 +744,12 @@ def admin():
             "quality": quality,
             "overview": "No overview available.",
             "poster": "",
-            "year": "N/A", # Keep year for initial display
-            "release_date": "N/A", # Full release date
+            "year": "N/A",
+            "release_date": "N/A",
             "vote_average": None,
             "original_language": "N/A",
             "genres": [],
-            "tmdb_id": None # Store TMDb ID
+            "tmdb_id": None
         }
 
         if TMDB_API_KEY:
@@ -721,12 +761,19 @@ def admin():
                     movie_data["title"] = data.get("title", title)
                     movie_data["overview"] = data.get("overview", "No overview available.")
                     movie_data["poster"] = f"https://image.tmdb.org/t/p/w500{data['poster_path']}" if data.get("poster_path") else ""
-                    movie_data["year"] = data.get("release_date", "")[:4] # Keep for card view
-                    movie_data["release_date"] = data.get("release_date", "N/A") # Full date
+                    movie_data["year"] = data.get("release_date", "")[:4]
+                    movie_data["release_date"] = data.get("release_date", "N/A")
                     movie_data["vote_average"] = data.get("vote_average")
                     movie_data["original_language"] = data.get("original_language", "N/A")
-                    movie_data["genres"] = [g["name"] for g in data.get("genre_ids", []) if g in TMDb_Genre_Map] # Map genre IDs to names
-                    movie_data["tmdb_id"] = data.get("id") # Store TMDb ID
+                    
+                    # Convert genre IDs to names for storing in DB
+                    genres_names = []
+                    for genre_id in data.get("genre_ids", []):
+                        if genre_id in TMDb_Genre_Map:
+                            genres_names.append(TMDb_Genre_Map[genre_id])
+                    movie_data["genres"] = genres_names
+                    
+                    movie_data["tmdb_id"] = data.get("id")
                 else:
                     print(f"No results found on TMDb for title: {title}")
             except requests.exceptions.RequestException as e:
@@ -745,14 +792,6 @@ def admin():
             return render_template_string(admin_html, error="Failed to add movie.")
 
     return render_template_string(admin_html)
-
-# TMDb Genre Map (for converting genre IDs to names) - Add this at the top of your file
-TMDb_Genre_Map = {
-    28: "Action", 12: "Adventure", 16: "Animation", 35: "Comedy", 80: "Crime",
-    99: "Documentary", 18: "Drama", 10751: "Family", 14: "Fantasy", 36: "History",
-    27: "Horror", 10402: "Music", 9648: "Mystery", 10749: "Romance", 878: "Science Fiction",
-    10770: "TV Movie", 53: "Thriller", 10752: "War", 37: "Western"
-}
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000, debug=True)
