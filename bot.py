@@ -36,14 +36,13 @@ TMDb_Genre_Map = {
 }
 
 # --- START OF index_html TEMPLATE ---
-# (The updated index_html template will go here as a multi-line string)
 index_html = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Movie Dokan Style</title>
+<title>MovieZone - Your Entertainment Hub</title>
 <style>
   /* Reset & basics */
   * {
@@ -417,7 +416,7 @@ index_html = """
 </head>
 <body>
 <header>
-  <h1>Movie Dokan</h1>
+  <h1>MovieZone</h1>
   <form method="GET" action="/">
     <input type="search" name="q" placeholder="Search movies..." value="{{ query|default('') }}" />
   </form>
@@ -465,7 +464,7 @@ index_html = """
     {% endif %}
   {% else %}
     <div class="category-header">
-      <h2>Trending on MovieDokan</h2>
+      <h2>Trending on MovieZone</h2>
       <a href="{{ url_for('trending_movies') }}" class="see-all-btn">See All</a>
     </div>
     {% if trending_movies|length == 0 %}
@@ -658,7 +657,7 @@ detail_html = """
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>{{ movie.title if movie else "Movie Not Found" }} - Movie Details</title>
+<title>{{ movie.title if movie else "Movie Not Found" }} - MovieZone Details</title>
 <style>
   /* General styles (similar to index_html for consistency) */
   * { box-sizing: border-box; margin: 0; padding: 0;}
@@ -927,7 +926,7 @@ detail_html = """
 <body>
 <header>
   <a href="{{ url_for('home') }}" class="back-button"><i class="fas fa-arrow-left"></i>Back</a>
-  <h1>Movie Dokan</h1>
+  <h1>MovieZone</h1>
 </header>
 <main>
   {% if movie %}
@@ -1013,7 +1012,7 @@ admin_html = """
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Admin Panel - Movie Dokan</title>
+  <title>Admin Panel - MovieZone</title>
   <style>
     body { font-family: Arial, sans-serif; background: #121212; color: #eee; padding: 20px; }
     h2 { 
@@ -1291,7 +1290,7 @@ def home():
         coming_soon_movies_list = list(coming_soon_result)
 
     # Convert ObjectIds to strings for all fetched lists
-    for m in movies_list + trending_movies_list + latest_movies_list + latest_series_list + coming_soon_movies_list:
+    for m in movies_list + trending_movies_list + latest_movies_list + latest_movies_list + latest_series_list + coming_soon_movies_list:
         m['_id'] = str(m['_id']) 
 
     return render_template_string(
@@ -1491,7 +1490,7 @@ def admin():
 
         try:
             movies.insert_one(movie_data)
-            print(f"Content '{movie_data['title']}' added successfully!")
+            print(f"Content '{movie_data['title']}' added successfully to MovieZone!")
             return redirect(url_for('admin'))
         except Exception as e:
             print(f"Error inserting content into MongoDB: {e}")
@@ -1510,9 +1509,9 @@ def delete_movie(movie_id):
         # Delete the movie from MongoDB using its ObjectId
         result = movies.delete_one({"_id": ObjectId(movie_id)})
         if result.deleted_count == 1:
-            print(f"Content with ID {movie_id} deleted successfully!")
+            print(f"Content with ID {movie_id} deleted successfully from MovieZone!")
         else:
-            print(f"Content with ID {movie_id} not found.")
+            print(f"Content with ID {movie_id} not found in MovieZone database.")
     except Exception as e:
         print(f"Error deleting content with ID {movie_id}: {e}")
     
@@ -1525,30 +1524,29 @@ def trending_movies():
     trending_list = list(movies.find({"quality": "TRENDING"}).sort('_id', -1))
     for m in trending_list:
         m['_id'] = str(m['_id'])
-    return render_template_string(index_html, movies=trending_list, query="Trending") # Use 'movies' for general display
+    return render_template_string(index_html, movies=trending_list, query="Trending on MovieZone") # Use 'movies' for general display
 
 @app.route('/movies_only')
 def movies_only():
     movie_list = list(movies.find({"type": "movie", "quality": {"$ne": "TRENDING"}, "is_coming_soon": {"$ne": True}}).sort('_id', -1))
     for m in movie_list:
         m['_id'] = str(m['_id'])
-    return render_template_string(index_html, movies=movie_list, query="All Movies")
+    return render_template_string(index_html, movies=movie_list, query="All Movies on MovieZone")
 
 @app.route('/webseries')
 def webseries():
     series_list = list(movies.find({"type": "series", "quality": {"$ne": "TRENDING"}, "is_coming_soon": {"$ne": True}}).sort('_id', -1))
     for m in series_list:
         m['_id'] = str(m['_id'])
-    return render_template_string(index_html, movies=series_list, query="All Web Series")
+    return render_template_string(index_html, movies=series_list, query="All Web Series on MovieZone")
 
 @app.route('/coming_soon')
 def coming_soon():
     coming_soon_list = list(movies.find({"is_coming_soon": True}).sort('_id', -1))
     for m in coming_soon_list:
         m['_id'] = str(m['_id'])
-    return render_template_string(index_html, movies=coming_soon_list, query="Coming Soon")
+    return render_template_string(index_html, movies=coming_soon_list, query="Coming Soon to MovieZone")
 
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000, debug=True)
-
