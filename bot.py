@@ -662,6 +662,17 @@ index_html = """
       {% endif %}
     {% endif %}
   {% endif %} {# End of is_full_page_list / else query block #}
+  <footer style="margin-top: 40px; padding: 20px; text-align: center; background: #181818; border-radius: 8px;">
+      <p style="font-size: 14px; color: #bbb; margin-bottom: 10px;">&copy; 2025 MovieZone. All rights reserved.</p>
+      <div style="display: flex; justify-content: center; gap: 20px;">
+          <a href="{{ url_for('about_us') }}" style="color: #1db954; font-size: 14px;">About Us</a>
+          <a href="{{ url_for('contact_us') }}" style="color: #1db954; font-size: 14px;">Contact Us</a>
+          <a href="{{ url_for('privacy_policy') }}" style="color: #1db954; font-size: 14px;">Privacy Policy</a>
+          <a href="{{ url_for('terms_conditions') }}" style="color: #1db954; font-size: 14px;">Terms & Conditions</a>
+          <a href="{{ url_for('disclaimer') }}" style="color: #1db954; font-size: 14px;">Disclaimer</a>
+          <a href="{{ url_for('copyright_notice') }}" style="color: #1db954; font-size: 14px;">Copyright Notice</a>
+      </div>
+  </footer>
 </main>
 <nav class="bottom-nav">
   <a href="{{ url_for('home') }}" class="nav-item {% if request.endpoint == 'home' and not request.args.get('q') %}active{% endif %}">
@@ -680,7 +691,7 @@ index_html = """
     <i class="fas fa-tv"></i>
     <span>Web Series</span>
   </a>
-  <a href="{{ url_for('home') }}" class="nav-item {% if request.args.get('q') %}active{% endif %}">
+  <a href="{{ url_for('home', q=request.args.get('q')) }}" class="nav-item {% if request.args.get('q') %}active{% endif %}">
     <i class="fas fa-search"></i>
     <span>Search</span>
   </a>
@@ -1042,6 +1053,17 @@ detail_html = """
   {% else %}
     <p style="text-align:center; color:#999; margin-top: 40px;">Movie not found.</p>
   {% endif %}
+  <footer style="margin-top: 40px; padding: 20px; text-align: center; background: #181818; border-radius: 8px;">
+      <p style="font-size: 14px; color: #bbb; margin-bottom: 10px;">&copy; 2025 MovieZone. All rights reserved.</p>
+      <div style="display: flex; justify-content: center; gap: 20px;">
+          <a href="{{ url_for('about_us') }}" style="color: #1db954; font-size: 14px;">About Us</a>
+          <a href="{{ url_for('contact_us') }}" style="color: #1db954; font-size: 14px;">Contact Us</a>
+          <a href="{{ url_for('privacy_policy') }}" style="color: #1db954; font-size: 14px;">Privacy Policy</a>
+          <a href="{{ url_for('terms_conditions') }}" style="color: #1db954; font-size: 14px;">Terms & Conditions</a>
+          <a href="{{ url_for('disclaimer') }}" style="color: #1db954; font-size: 14px;">Disclaimer</a>
+          <a href="{{ url_for('copyright_notice') }}" style="color: #1db954; font-size: 14px;">Copyright Notice</a>
+      </div>
+  </footer>
 </main>
 <nav class="bottom-nav">
   <a href="{{ url_for('home') }}" class="nav-item {% if request.endpoint == 'home' and not request.args.get('q') %}active{% endif %}">
@@ -1060,7 +1082,7 @@ detail_html = """
     <i class="fas fa-tv"></i>
     <span>Web Series</span>
   </a>
-  <a href="{{ url_for('home') }}" class="nav-item {% if request.args.get('q') %}active{% endif %}">
+  <a href="{{ url_for('home', q=request.args.get('q')) }}" class="nav-item {% if request.args.get('q') %}active{% endif %}">
     <i class="fas fa-search"></i>
     <span>Search</span>
   </a>
@@ -1720,6 +1742,376 @@ edit_html = """
 """
 # --- END OF edit_html TEMPLATE ---
 
+# --- START OF new_pages_html ---
+# About Us Page
+about_us_html = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>About Us - MovieZone</title>
+<style>
+  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #121212; color: #eee; padding: 20px; }
+  h1 { 
+    background: linear-gradient(270deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #9400d3);
+    background-size: 400% 400%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: gradientShift 10s ease infinite;
+    display: inline-block;
+    font-size: 32px;
+    margin-bottom: 20px;
+  }
+  @keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  .container { max-width: 800px; margin: 20px auto; background: #181818; padding: 30px; border-radius: 8px; box-shadow: 0 0 15px rgba(0,0,0,0.7); }
+  p { line-height: 1.6; margin-bottom: 15px; color: #ccc; }
+  a { color: #1db954; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .back-button { display: inline-block; margin-bottom: 20px; color: #1db954; text-decoration: none; font-weight: bold; }
+  .back-button:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="container">
+  <a href="{{ url_for('home') }}" class="back-button">&larr; Back to Home</a>
+  <h1>About Us</h1>
+  <p>Welcome to <strong>MovieZone</strong> – your ultimate destination for movies and web series! We are passionate about bringing you the best entertainment content from around the globe.</p>
+  <p>Our mission is to provide a seamless and enjoyable streaming experience, offering a vast library of films and series across various genres. Whether you're looking for the latest blockbusters, timeless classics, or trending web series, MovieZone has something for everyone.</p>
+  <p>We are committed to keeping our content updated regularly and ensuring high-quality streams. Thank you for choosing MovieZone as your entertainment hub!</p>
+</div>
+</body>
+</html>
+"""
+
+# Contact Us Page
+contact_us_html = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Contact Us - MovieZone</title>
+<style>
+  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #121212; color: #eee; padding: 20px; }
+  h1 { 
+    background: linear-gradient(270deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #9400d3);
+    background-size: 400% 400%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: gradientShift 10s ease infinite;
+    display: inline-block;
+    font-size: 32px;
+    margin-bottom: 20px;
+  }
+  @keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  .container { max-width: 800px; margin: 20px auto; background: #181818; padding: 30px; border-radius: 8px; box-shadow: 0 0 15px rgba(0,0,0,0.7); }
+  p { line-height: 1.6; margin-bottom: 15px; color: #ccc; }
+  a { color: #1db954; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .contact-info { margin-top: 20px; }
+  .contact-info p { margin-bottom: 10px; }
+  .back-button { display: inline-block; margin-bottom: 20px; color: #1db954; text-decoration: none; font-weight: bold; }
+  .back-button:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="container">
+  <a href="{{ url_for('home') }}" class="back-button">&larr; Back to Home</a>
+  <h1>Contact Us</h1>
+  <p>We'd love to hear from you! If you have any questions, suggestions, or feedback, please don't hesitate to reach out.</p>
+  <div class="contact-info">
+    <p><strong>Email:</strong> support@moviezone.com</p>
+    <p><strong>Telegram Support:</strong> <a href="https://t.me/Movie_Request_Group_23" target="_blank" rel="noopener">Join our Telegram Group</a></p>
+    <p>We aim to respond to all inquiries within 24-48 hours.</p>
+  </div>
+</div>
+</body>
+</html>
+"""
+
+# Privacy Policy Page
+privacy_policy_html = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Privacy Policy - MovieZone</title>
+<style>
+  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #121212; color: #eee; padding: 20px; }
+  h1 { 
+    background: linear-gradient(270deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #9400d3);
+    background-size: 400% 400%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: gradientShift 10s ease infinite;
+    display: inline-block;
+    font-size: 32px;
+    margin-bottom: 20px;
+  }
+  @keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  .container { max-width: 800px; margin: 20px auto; background: #181818; padding: 30px; border-radius: 8px; box-shadow: 0 0 15px rgba(0,0,0,0.7); }
+  h2 { color: #1db954; margin-top: 25px; margin-bottom: 10px; font-size: 24px;}
+  p, ul { line-height: 1.6; margin-bottom: 15px; color: #ccc; }
+  ul { list-style-type: disc; margin-left: 20px; }
+  a { color: #1db954; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .back-button { display: inline-block; margin-bottom: 20px; color: #1db954; text-decoration: none; font-weight: bold; }
+  .back-button:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="container">
+  <a href="{{ url_for('home') }}" class="back-button">&larr; Back to Home</a>
+  <h1>Privacy Policy</h1>
+  <p>This Privacy Policy describes how MovieZone collects, uses, and discloses your information when you use our service.</p>
+
+  <h2>Information We Collect</h2>
+  <p>We do not collect any personally identifiable information from our users. We do not require registration or any personal details to access our content.</p>
+  <ul>
+    <li><strong>Non-Personal Data:</strong> We may collect anonymous, aggregated data related to website usage, such as pages visited and time spent on the site, to improve our services. This data cannot be used to identify you personally.</li>
+    <li><strong>Cookies:</strong> We do not use cookies for tracking or personalization purposes.</li>
+  </ul>
+
+  <h2>How We Use Your Information</h2>
+  <p>Since we do not collect personal information, we do not use it for any personal tracking, advertising, or sharing.</p>
+  <ul>
+    <li>Aggregated non-personal data is used solely for internal analysis to enhance website performance and user experience.</li>
+  </ul>
+
+  <h2>Third-Party Links</h2>
+  <p>Our website may contain links to third-party websites or services that are not operated by us. We have no control over and assume no responsibility for the content, privacy policies, or practices of any third-party sites or services.</p>
+
+  <h2>Security of Your Data</h2>
+  <p>While we strive to use commercially acceptable means to protect your non-personal data, remember that no method of transmission over the Internet or method of electronic storage is 100% secure. We cannot guarantee its absolute security.</p>
+
+  <h2>Changes to This Privacy Policy</h2>
+  <p>We may update our Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page. You are advised to review this Privacy Policy periodically for any changes.</p>
+
+  <h2>Contact Us</h2>
+  <p>If you have any questions about this Privacy Policy, please contact us:</p>
+  <ul>
+    <li>By email: support@moviezone.com</li>
+  </ul>
+</div>
+</body>
+</html>
+"""
+
+# Terms & Conditions Page
+terms_conditions_html = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Terms & Conditions - MovieZone</title>
+<style>
+  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #121212; color: #eee; padding: 20px; }
+  h1 { 
+    background: linear-gradient(270deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #9400d3);
+    background-size: 400% 400%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: gradientShift 10s ease infinite;
+    display: inline-block;
+    font-size: 32px;
+    margin-bottom: 20px;
+  }
+  @keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  .container { max-width: 800px; margin: 20px auto; background: #181818; padding: 30px; border-radius: 8px; box-shadow: 0 0 15px rgba(0,0,0,0.7); }
+  h2 { color: #1db954; margin-top: 25px; margin-bottom: 10px; font-size: 24px;}
+  p, ol, ul { line-height: 1.6; margin-bottom: 15px; color: #ccc; }
+  ol, ul { margin-left: 20px; }
+  ol li, ul li { margin-bottom: 8px; }
+  a { color: #1db954; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .back-button { display: inline-block; margin-bottom: 20px; color: #1db954; text-decoration: none; font-weight: bold; }
+  .back-button:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="container">
+  <a href="{{ url_for('home') }}" class="back-button">&larr; Back to Home</a>
+  <h1>Terms & Conditions</h1>
+  <p>Welcome to MovieZone. By accessing or using our website, you agree to comply with and be bound by the following terms and conditions. Please review them carefully.</p>
+
+  <h2>1. Acceptance of Terms</h2>
+  <p>By using MovieZone, you acknowledge that you have read, understood, and agree to be bound by these Terms and Conditions. If you do not agree, you should not use this Website.</p>
+
+  <h2>2. Content and Use</h2>
+  <ul>
+    <li>All content provided on MovieZone is for general informational and entertainment purposes only.</li>
+    <li>You agree not to reproduce, duplicate, copy, sell, resell, or exploit any portion of the service or content without express written permission from us.</li>
+  </ul>
+
+  <h2>3. User Conduct</h2>
+  <p>You agree to use MovieZone only for lawful purposes and in a way that does not infringe the rights of, restrict, or inhibit anyone else's use and enjoyment of the Website.</p>
+
+  <h2>4. Disclaimers</h2>
+  <p>MovieZone is provided "as is" and "as available" without any warranties, express or implied. We do not guarantee the accuracy, completeness, or reliability of any content on the Website.</p>
+
+  <h2>5. Limitation of Liability</h2>
+  <p>In no event shall MovieZone or its operators be liable for any direct, indirect, incidental, special, consequential, or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses, resulting from (i) your access to or use of or inability to access or use the Website; (ii) any conduct or content of any third party on the Website.</p>
+
+  <h2>6. Changes to Terms</h2>
+  <p>We reserve the right to modify these Terms & Conditions at any time. Your continued use of the Website after any such changes constitutes your acceptance of the new Terms & Conditions.</p>
+
+  <h2>7. Governing Law</h2>
+  <p>These Terms & Conditions are governed by and construed in accordance with the laws of Bangladesh.</p>
+
+  <h2>Contact Us</h2>
+  <p>If you have any questions regarding these Terms, please contact us at support@moviezone.com.</p>
+</div>
+</body>
+</html>
+"""
+
+# Disclaimer Page
+disclaimer_html = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Disclaimer - MovieZone</title>
+<style>
+  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #121212; color: #eee; padding: 20px; }
+  h1 { 
+    background: linear-gradient(270deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #9400d3);
+    background-size: 400% 400%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: gradientShift 10s ease infinite;
+    display: inline-block;
+    font-size: 32px;
+    margin-bottom: 20px;
+  }
+  @keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  .container { max-width: 800px; margin: 20px auto; background: #181818; padding: 30px; border-radius: 8px; box-shadow: 0 0 15px rgba(0,0,0,0.7); }
+  h2 { color: #1db954; margin-top: 25px; margin-bottom: 10px; font-size: 24px;}
+  p { line-height: 1.6; margin-bottom: 15px; color: #ccc; }
+  a { color: #1db954; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .back-button { display: inline-block; margin-bottom: 20px; color: #1db954; text-decoration: none; font-weight: bold; }
+  .back-button:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="container">
+  <a href="{{ url_for('home') }}" class="back-button">&larr; Back to Home</a>
+  <h1>Disclaimer</h1>
+  <p>The information provided by MovieZone on this website is for general informational purposes only. All information on the site is provided in good faith, however, we make no representation or warranty of any kind, express or implied, regarding the accuracy, adequacy, validity, reliability, availability, or completeness of any information on the site.</p>
+
+  <h2>External Links Disclaimer</h2>
+  <p>The MovieZone website may contain links to external websites that are not provided or maintained by or in any way affiliated with us. Please note that MovieZone does not guarantee the accuracy, relevance, timeliness, or completeness of any information on these external websites.</p>
+
+  <h2>Professional Disclaimer</h2>
+  <p>The site cannot and does not contain legal, medical, or other professional advice. The information is provided for general informational and educational purposes only and is not a substitute for professional advice.</p>
+
+  <h2>Fair Use Notice</h2>
+  <p>This site may contain copyrighted material the use of which has not always been specifically authorized by the copyright owner. We are making such material available in our efforts to advance understanding of environmental, political, human rights, economic, democracy, scientific, and social justice issues, etc. We believe this constitutes a 'fair use' of any such copyrighted material as provided for in section 107 of the US Copyright Law.</p>
+
+  <h2>Accuracy of Information</h2>
+  <p>While we strive to keep the information up to date and correct, we make no representations or warranties of any kind, express or implied, about the completeness, accuracy, reliability, suitability, or availability with respect to the website or the information, products, services, or related graphics contained on the website for any purpose. Any reliance you place on such information is therefore strictly at your own risk.</p>
+
+  <h2>Consent</h2>
+  <p>By using our website, you hereby consent to our disclaimer and agree to its terms.</p>
+
+  <h2>Update</h2>
+  <p>Should we update, amend, or make any changes to this document, those changes will be prominently posted here.</p>
+</div>
+</body>
+</html>
+"""
+
+# Copyright Notice Page
+copyright_notice_html = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Copyright Notice - MovieZone</title>
+<style>
+  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #121212; color: #eee; padding: 20px; }
+  h1 { 
+    background: linear-gradient(270deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #9400d3);
+    background-size: 400% 400%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: gradientShift 10s ease infinite;
+    display: inline-block;
+    font-size: 32px;
+    margin-bottom: 20px;
+  }
+  @keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  .container { max-width: 800px; margin: 20px auto; background: #181818; padding: 30px; border-radius: 8px; box-shadow: 0 0 15px rgba(0,0,0,0.7); }
+  h2 { color: #1db954; margin-top: 25px; margin-bottom: 10px; font-size: 24px;}
+  p { line-height: 1.6; margin-bottom: 15px; color: #ccc; }
+  a { color: #1db954; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .back-button { display: inline-block; margin-bottom: 20px; color: #1db954; text-decoration: none; font-weight: bold; }
+  .back-button:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="container">
+  <a href="{{ url_for('home') }}" class="back-button">&larr; Back to Home</a>
+  <h1>Copyright Notice</h1>
+  <p>&copy; 2025 MovieZone. All rights reserved.</p>
+
+  <h2>Ownership of Content</h2>
+  <p>All content on this website, including but not limited to text, graphics, logos, images, and software, is the property of MovieZone or its content suppliers and is protected by international copyright laws. The compilation of all content on this site is the exclusive property of MovieZone.</p>
+
+  <h2>Limited License</h2>
+  <p>You may view, download for caching purposes only, and print pages from the website for your own personal use, subject to the restrictions set out below and elsewhere in this copyright notice:</p>
+  <ul>
+    <li>You must not republish material from this website (including republication on another website).</li>
+    <li>You must not sell, rent, or sub-license material from the website.</li>
+    <li>You must not reproduce, duplicate, copy, or otherwise exploit material on this website for a commercial purpose.</li>
+    <li>You must not redistribute material from this website, except for content specifically and expressly made available for redistribution (such as our newsletters).</li>
+  </ul>
+
+  <h2>Permissions</h2>
+  <p>You may request permission to use the copyright materials on this website by writing to support@moviezone.com.</p>
+
+  <h2>Enforcement of Copyright</h2>
+  <p>MovieZone takes the protection of its copyright very seriously. If MovieZone discovers that you have used its copyright materials in contravention of the license above, MovieZone may bring legal proceedings against you seeking monetary damages and an injunction to stop you from using those materials. You could also be ordered to pay legal costs.</p>
+
+  <h2>Report Infringement</h2>
+  <p>If you become aware of any copyright material on our website that you believe infringes your or any other person's copyright, please report this by email to support@moviezone.com.</p>
+</div>
+</body>
+</html>
+"""
+# --- END OF new_pages_html ---
+
 
 @app.route('/')
 def home():
@@ -2001,7 +2393,8 @@ def admin():
     search_query = request.args.get('search_query')
     if search_query:
         # Perform case-insensitive search on title
-        all_content = list(movies.find({"title": {"$regex": search_query, "$options": "i"}}).sort('_id', -1))
+        all_content = list(movies.find({"title": {"$regex": search_query, "$options": "i"}})
+                            .sort('_id', -1))
     else:
         all_content = list(movies.find().sort('_id', -1))
     
@@ -2200,6 +2593,32 @@ def coming_soon():
         m['_id'] = str(m['_id'])
     # Pass is_full_page_list=True and use 'movies' for the list
     return render_template_string(index_html, movies=coming_soon_list, query="Coming Soon to MovieZone", is_full_page_list=True)
+
+# --- START of New Pages Routes ---
+@app.route('/about-us')
+def about_us():
+    return render_template_string(about_us_html)
+
+@app.route('/contact-us')
+def contact_us():
+    return render_template_string(contact_us_html)
+
+@app.route('/privacy-policy')
+def privacy_policy():
+    return render_template_string(privacy_policy_html)
+
+@app.route('/terms-conditions')
+def terms_conditions():
+    return render_template_string(terms_conditions_html)
+
+@app.route('/disclaimer')
+def disclaimer():
+    return render_template_string(disclaimer_html)
+
+@app.route('/copyright-notice')
+def copyright_notice():
+    return render_template_string(copyright_notice_html)
+# --- END of New Pages Routes ---
 
 
 if __name__ == "__main__":
