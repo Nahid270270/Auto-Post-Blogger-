@@ -715,7 +715,7 @@ admin_html = """
       animation: gradientShift 10s ease infinite;
       display: inline-block;
       font-size: 28px;
-      margin-bottom: 20px; /* Added margin */
+      margin-bottom: 20px;
     }
     @keyframes gradientShift {
       0% { background-position: 0% 50%; }
@@ -724,7 +724,6 @@ admin_html = """
     }
     form { max-width: 600px; margin-bottom: 40px; border: 1px solid #333; padding: 20px; border-radius: 8px;}
     
-    /* Input field specific styles */
     .form-group {
         margin-bottom: 15px;
     }
@@ -734,19 +733,22 @@ admin_html = """
         font-weight: bold;
         color: #ddd;
     }
-    input[type="text"], input[type="url"], button {
+    input[type="text"], input[type="url"], textarea, button { /* Added textarea */
       width: 100%;
       padding: 10px;
-      margin-bottom: 15px; /* Adjust this if form-group already has margin */
+      margin-bottom: 15px;
       border-radius: 5px;
       border: none;
       font-size: 16px;
       background: #222;
       color: #eee;
     }
-    /* Specific input for the link section */
+    textarea {
+        resize: vertical; /* Allow vertical resizing of textarea */
+        min-height: 80px;
+    }
     .link-input-group input[type="url"] {
-        margin-bottom: 5px; /* Smaller margin between link inputs */
+        margin-bottom: 5px;
     }
     .link-input-group p {
         font-size: 14px;
@@ -765,7 +767,6 @@ admin_html = """
       background: #17a34a;
     }
 
-    /* Styles for Movie List */
     table {
         width: 100%;
         border-collapse: collapse;
@@ -791,9 +792,9 @@ admin_html = """
         border: none;
         cursor: pointer;
         transition: background 0.3s ease;
-        font-size: 14px; /* Smaller font for table button */
-        width: auto; /* Override full width */
-        margin-bottom: 0; /* Remove bottom margin */
+        font-size: 14px;
+        width: auto;
+        margin-bottom: 0;
     }
     .delete-btn:hover {
         background: #d43d16;
@@ -835,6 +836,31 @@ admin_html = """
     <div class="form-group">
         <label for="quality">Quality Tag (e.g., HD, Hindi Dubbed, TRENDING):</label>
         <input type="text" name="quality" id="quality" placeholder="Quality tag" />
+    </div>
+
+    <div class="form-group">
+        <label for="overview">Overview (Optional - used if TMDb info not found):</label>
+        <textarea name="overview" id="overview" rows="5" placeholder="Enter movie overview or synopsis"></textarea>
+    </div>
+
+    <div class="form-group">
+        <label for="poster_url">Poster URL (Optional - direct image link, used if TMDb info not found):</label>
+        <input type="url" name="poster_url" id="poster_url" placeholder="e.g., https://example.com/poster.jpg" />
+    </div>
+
+    <div class="form-group">
+        <label for="year">Release Year (Optional - used if TMDb info not found):</label>
+        <input type="text" name="year" id="year" placeholder="e.g., 2023" />
+    </div>
+
+    <div class="form-group">
+        <label for="original_language">Original Language (Optional - used if TMDb info not found):</label>
+        <input type="text" name="original_language" id="original_language" placeholder="e.g., Bengali, English" />
+    </div>
+
+    <div class="form-group">
+        <label for="genres">Genres (Optional - comma-separated, used if TMDb info not found):</label>
+        <input type="text" name="genres" id="genres" placeholder="e.g., Action, Drama, Thriller" />
     </div>
     
     <button type="submit">Add Movie</button>
@@ -904,7 +930,11 @@ def movie_detail(movie_id):
             movie['_id'] = str(movie['_id'])
             
             # Fetch additional details from TMDb if API key is available
-            if TMDB_API_KEY:
+            # Only fetch if tmdb_id is not already present or if the existing poster/overview are default values.
+            # This logic can be more sophisticated but serves the purpose.
+            should_fetch_tmdb = TMDB_API_KEY and (not movie.get("tmdb_id") or movie.get("overview") == "No overview available." or not movie.get("poster"))
+
+            if should_fetch_tmdb:
                 tmdb_id = movie.get("tmdb_id") 
                 
                 # If TMDb ID is not stored, search by title first
@@ -932,17 +962,39 @@ def movie_detail(movie_id):
                     try:
                         res = requests.get(tmdb_detail_url, timeout=5).json()
                         if res:
-                            movie["overview"] = res.get("overview", movie.get("overview", "No overview available."))
-                            movie["poster"] = f"https://image.tmdb.org/t/p/w500{res['poster_path']}" if res.get("poster_path") else movie.get("poster", "")
-                            movie["release_date"] = res.get("release_date", movie.get("year", "N/A"))
-                            movie["vote_average"] = res.get("vote_average")
-                            movie["original_language"] = res.get("original_language")
+                            # Only update if TMDb provides a better value
+                            if res.get("overview"):
+                                movie["overview"] = res.get("overview")
+                            if res.get("poster_path"):
+                                movie["poster"] = f"https://image.tmdb.org/t/p/w500{res['poster_path']}"
+                            
+                            release_date = res.get("release_date", "")
+                            if release_date:
+                                movie["year"] = release_date[:4]
+                                movie["release_date"] = release_date
+                            
+                            if res.get("vote_average"):
+                                movie["vote_average"] = res.get("vote_average")
+                            if res.get("original_language"):
+                                movie["original_language"] = res.get("original_language")
                             
                             genres_names = []
                             for genre_obj in res.get("genres", []):
                                 if isinstance(genre_obj, dict) and genre_obj.get("id") in TMDb_Genre_Map:
                                     genres_names.append(TMDb_Genre_Map[genre_obj["id"]])
-                            movie["genres"] = genres_names
+                            if genres_names: # Only update if TMDb provides genres
+                                movie["genres"] = genres_names
+
+                            # Persist TMDb fetched data to DB
+                            movies.update_one({"_id": ObjectId(movie_id)}, {"$set": {
+                                "overview": movie["overview"],
+                                "poster": movie["poster"],
+                                "year": movie["year"],
+                                "release_date": movie["release_date"],
+                                "vote_average": movie["vote_average"],
+                                "original_language": movie["original_language"],
+                                "genres": movie["genres"]
+                            }})
                     except requests.exceptions.RequestException as e:
                         print(f"Error connecting to TMDb API for detail '{movie_id}': {e}")
                     except Exception as e:
@@ -950,7 +1002,7 @@ def movie_detail(movie_id):
                 else:
                     print(f"TMDb ID not found for movie '{movie.get('title', movie_id)}'. Skipping TMDb detail fetch.")
             else:
-                print("TMDB_API_KEY not set. Cannot fetch additional details.")
+                print("Skipping TMDb API call for movie details (no key, or data already present).")
 
         return render_template_string(detail_html, movie=movie)
     except Exception as e:
@@ -961,9 +1013,9 @@ def movie_detail(movie_id):
 def admin():
     if request.method == "POST":
         title = request.form.get("title")
-        quality_tag = request.form.get("quality", "").upper() # Renamed to avoid confusion with link quality
+        quality_tag = request.form.get("quality", "").upper()
         
-        # New: Collect links from individual input fields
+        # Collect links from individual input fields
         links_list = []
         
         link_480p = request.form.get("link_480p")
@@ -978,50 +1030,62 @@ def admin():
         if link_1080p:
             links_list.append({"quality": "1080p", "size": "2.9GB", "url": link_1080p})
         
+        # Get manual inputs
+        manual_overview = request.form.get("overview")
+        manual_poster_url = request.form.get("poster_url")
+        manual_year = request.form.get("year")
+        manual_original_language = request.form.get("original_language")
+        manual_genres_str = request.form.get("genres")
+        
+        # Process manual genres (comma-separated string to list)
+        manual_genres_list = [g.strip() for g in manual_genres_str.split(',') if g.strip()] if manual_genres_str else []
+
         # Determine if it's a movie or web series. Default to movie.
-        # You might want a dedicated field for this in admin_html later.
-        # For now, let's assume if it has "Series" in title or quality tag, it's a series.
         content_type = "movie"
         if "SERIES" in title.upper() or "SERIES" in quality_tag.upper():
             content_type = "series"
 
         movie_data = {
             "title": title,
-            "links": links_list, # This is now built from individual inputs
-            "quality": quality_tag, # General quality tag
-            "type": content_type, # New field for content type
-            "overview": "No overview available.",
-            "poster": "",
-            "year": "N/A",
-            "release_date": "N/A",
+            "links": links_list,
+            "quality": quality_tag,
+            "type": content_type,
+            "overview": manual_overview if manual_overview else "No overview available.",
+            "poster": manual_poster_url if manual_poster_url else "",
+            "year": manual_year if manual_year else "N/A",
+            "release_date": manual_year if manual_year else "N/A", # Using year as release_date if only year is provided
             "vote_average": None,
-            "original_language": "N/A",
-            "genres": [],
-            "tmdb_id": None # Initialize tmdb_id
+            "original_language": manual_original_language if manual_original_language else "N/A",
+            "genres": manual_genres_list,
+            "tmdb_id": None
         }
 
-        if TMDB_API_KEY:
+        # Try to fetch from TMDb only if no manual poster or overview was provided
+        if TMDB_API_KEY and not manual_poster_url and not manual_overview:
             tmdb_url = f"https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={title}"
             try:
                 res = requests.get(tmdb_url, timeout=5).json()
                 if res and "results" in res and res["results"]:
                     data = res["results"][0]
-                    movie_data["title"] = data.get("title", title)
-                    movie_data["overview"] = data.get("overview", "No overview available.")
-                    movie_data["poster"] = f"https://image.tmdb.org/t/p/w500{data['poster_path']}" if data.get("poster_path") else ""
+                    # Overwrite only if TMDb provides a value
+                    movie_data["title"] = data.get("title", movie_data["title"]) # Keep manual title if TMDb title is bad
+                    movie_data["overview"] = data.get("overview", movie_data["overview"])
+                    movie_data["poster"] = f"https://image.tmdb.org/t/p/w500{data['poster_path']}" if data.get("poster_path") else movie_data["poster"]
                     
                     release_date = data.get("release_date", "")
-                    movie_data["year"] = release_date[:4] if release_date else "N/A"
+                    if release_date:
+                        movie_data["year"] = release_date[:4]
+                        movie_data["release_date"] = release_date
                     
-                    movie_data["release_date"] = release_date
-                    movie_data["vote_average"] = data.get("vote_average")
-                    movie_data["original_language"] = data.get("original_language", "N/A")
+                    movie_data["vote_average"] = data.get("vote_average", movie_data["vote_average"])
+                    movie_data["original_language"] = data.get("original_language", movie_data["original_language"])
                     
                     genres_names = []
                     for genre_id in data.get("genre_ids", []):
                         if genre_id in TMDb_Genre_Map:
                             genres_names.append(TMDb_Genre_Map[genre_id])
-                    movie_data["genres"] = genres_names
+                    if genres_names: # Only update genres if TMDb provides them
+                        movie_data["genres"] = genres_names
                     
                     movie_data["tmdb_id"] = data.get("id")
                 else:
@@ -1031,7 +1095,7 @@ def admin():
             except Exception as e:
                 print(f"An unexpected error occurred while fetching TMDb data: {e}")
         else:
-            print("TMDB_API_KEY not set. Skipping TMDb API call.")
+            print("Skipping TMDb API call (no key, or manual poster/overview provided).")
 
         try:
             movies.insert_one(movie_data)
