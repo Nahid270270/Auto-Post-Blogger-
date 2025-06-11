@@ -329,23 +329,23 @@ index_html = """
   {% endif %}
 </main>
 <nav class="bottom-nav">
-  <a href="{{ url_for('home') }}" class="nav-item active">
+  <a href="{{ url_for('home') }}" class="nav-item {% if request.endpoint == 'home' and not request.args.get('q') %}active{% endif %}">
     <i class="fas fa-home"></i>
     <span>Home</span>
   </a>
-  <a href="#" class="nav-item">
+  <a href="{{ url_for('movies_only') }}" class="nav-item {% if request.endpoint == 'movies_only' %}active{% endif %}">
     <i class="fas fa-film"></i>
     <span>Movie</span>
   </a>
-  <a href="{{ url_for('admin') }}" class="nav-item">
+  <a href="YOUR_TELEGRAM_GROUP_LINK" class="nav-item" target="_blank" rel="noopener">
     <i class="fas fa-plus-circle"></i>
     <span>Request</span>
   </a>
-  <a href="#" class="nav-item">
+  <a href="{{ url_for('webseries') }}" class="nav-item {% if request.endpoint == 'webseries' %}active{% endif %}">
     <i class="fas fa-tv"></i>
     <span>Web Series</span>
   </a>
-  <a href="#" class="nav-item">
+  <a href="{{ url_for('home') }}" class="nav-item {% if request.args.get('q') %}active{% endif %}">
     <i class="fas fa-search"></i>
     <span>Search</span>
   </a>
@@ -672,23 +672,23 @@ detail_html = """
   {% endif %}
 </main>
 <nav class="bottom-nav">
-  <a href="{{ url_for('home') }}" class="nav-item">
+  <a href="{{ url_for('home') }}" class="nav-item {% if request.endpoint == 'home' and not request.args.get('q') %}active{% endif %}">
     <i class="fas fa-home"></i>
     <span>Home</span>
   </a>
-  <a href="#" class="nav-item">
+  <a href="{{ url_for('movies_only') }}" class="nav-item {% if request.endpoint == 'movies_only' %}active{% endif %}">
     <i class="fas fa-film"></i>
     <span>Movie</span>
   </a>
-  <a href="{{ url_for('admin') }}" class="nav-item">
+  <a href="YOUR_TELEGRAM_GROUP_LINK" class="nav-item" target="_blank" rel="noopener">
     <i class="fas fa-plus-circle"></i>
     <span>Request</span>
   </a>
-  <a href="#" class="nav-item">
+  <a href="{{ url_for('webseries') }}" class="nav-item {% if request.endpoint == 'webseries' %}active{% endif %}">
     <i class="fas fa-tv"></i>
     <span>Web Series</span>
   </a>
-  <a href="#" class="nav-item">
+  <a href="{{ url_for('home') }}" class="nav-item {% if request.args.get('q') %}active{% endif %}">
     <i class="fas fa-search"></i>
     <span>Search</span>
   </a>
@@ -723,20 +723,37 @@ admin_html = """
       100% { background-position: 0% 50%; }
     }
     form { max-width: 600px; margin-bottom: 40px; border: 1px solid #333; padding: 20px; border-radius: 8px;}
-    input[type="text"], input[type="url"], button, textarea { /* Added textarea for better link input */
+    
+    /* Input field specific styles */
+    .form-group {
+        margin-bottom: 15px;
+    }
+    .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+        color: #ddd;
+    }
+    input[type="text"], input[type="url"], button {
       width: 100%;
       padding: 10px;
-      margin-bottom: 15px;
+      margin-bottom: 15px; /* Adjust this if form-group already has margin */
       border-radius: 5px;
       border: none;
       font-size: 16px;
       background: #222;
       color: #eee;
     }
-    textarea {
-        min-height: 80px; /* Make textarea taller */
-        resize: vertical;
+    /* Specific input for the link section */
+    .link-input-group input[type="url"] {
+        margin-bottom: 5px; /* Smaller margin between link inputs */
     }
+    .link-input-group p {
+        font-size: 14px;
+        color: #bbb;
+        margin-bottom: 5px;
+    }
+
     button {
       background: #1db954;
       color: #000;
@@ -794,9 +811,32 @@ admin_html = """
 <body>
   <h2>Add New Movie</h2>
   <form method="post">
-    <input type="text" name="title" placeholder="Movie Title" required />
-    <textarea name="link" placeholder="Download Links (Format: Quality:Size:URL, e.g., Bangla 480p:590MB:http://link1.com,Bangla 720p:1.4GB:http://link2.com)"></textarea>
-    <input type="text" name="quality" placeholder="Quality tag (e.g. HD, Hindi Dubbed, TRENDING)" />
+    <div class="form-group">
+        <label for="title">Movie Title:</label>
+        <input type="text" name="title" id="title" placeholder="Movie Title" required />
+    </div>
+
+    <div class="form-group">
+        <label>Download Links (only paste URL):</label>
+        <div class="link-input-group">
+            <p>Bangla 480p [590MB]:</p>
+            <input type="url" name="link_480p" placeholder="Enter 480p download link" />
+        </div>
+        <div class="link-input-group">
+            <p>Bangla 720p [1.4GB]:</p>
+            <input type="url" name="link_720p" placeholder="Enter 720p download link" />
+        </div>
+        <div class="link-input-group">
+            <p>Bangla 1080p [2.9GB]:</p>
+            <input type="url" name="link_1080p" placeholder="Enter 1080p download link" />
+        </div>
+        </div>
+
+    <div class="form-group">
+        <label for="quality">Quality Tag (e.g., HD, Hindi Dubbed, TRENDING):</label>
+        <input type="text" name="quality" id="quality" placeholder="Quality tag" />
+    </div>
+    
     <button type="submit">Add Movie</button>
   </form>
 
@@ -842,7 +882,6 @@ admin_html = """
 """
 # --- END OF admin_html TEMPLATE ---
 
-
 @app.route('/')
 def home():
     query = request.args.get('q')
@@ -850,7 +889,7 @@ def home():
         result = movies.find({"title": {"$regex": query, "$options": "i"}})
     else:
         # Fetch up to 30 latest movies, sorting by _id (which is usually insertion order)
-        result = movies.find().sort('_id', -1).limit(30) 
+        result = movies.find({"type": {"$ne": "series"}}).sort('_id', -1).limit(30) # Home shows movies, excluding series
     
     movies_list = list(result)
     for movie in movies_list:
@@ -922,35 +961,35 @@ def movie_detail(movie_id):
 def admin():
     if request.method == "POST":
         title = request.form.get("title")
-        raw_link_input = request.form.get("link") # Changed from 'link' to 'raw_link_input'
-        quality = request.form.get("quality", "").upper()
+        quality_tag = request.form.get("quality", "").upper() # Renamed to avoid confusion with link quality
         
-        # New: Process raw_link_input into a list of link objects
+        # New: Collect links from individual input fields
         links_list = []
-        if raw_link_input:
-            # Expected format for admin input: "Quality:Size:URL,Quality:Size:URL"
-            # Example: "Bangla 480p:590MB:http://link1.com,Bangla 720p:1.4GB:http://link2.com"
-            individual_links_str = raw_link_input.split(',')
-            for link_str in individual_links_str:
-                parts = link_str.strip().split(':', 2) # Split by ':' at most 2 times
-                if len(parts) == 3:
-                    links_list.append({
-                        "quality": parts[0].strip(),
-                        "size": parts[1].strip(),
-                        "url": parts[2].strip()
-                    })
-                elif len(parts) == 1 and parts[0].strip(): # Fallback for simple URL input
-                    links_list.append({
-                        "quality": "Unknown Quality", # Default quality if only URL given
-                        "size": "N/A",   # Default size
-                        "url": parts[0].strip()
-                    })
-
+        
+        link_480p = request.form.get("link_480p")
+        if link_480p:
+            links_list.append({"quality": "Bangla 480p", "size": "590MB", "url": link_480p})
+            
+        link_720p = request.form.get("link_720p")
+        if link_720p:
+            links_list.append({"quality": "Bangla 720p", "size": "1.4GB", "url": link_720p})
+            
+        link_1080p = request.form.get("link_1080p")
+        if link_1080p:
+            links_list.append({"quality": "Bangla 1080p", "size": "2.9GB", "url": link_1080p})
+        
+        # Determine if it's a movie or web series. Default to movie.
+        # You might want a dedicated field for this in admin_html later.
+        # For now, let's assume if it has "Series" in title or quality tag, it's a series.
+        content_type = "movie"
+        if "SERIES" in title.upper() or "SERIES" in quality_tag.upper():
+            content_type = "series"
 
         movie_data = {
             "title": title,
-            "links": links_list, # Changed from 'link' to 'links' to store the list
-            "quality": quality,
+            "links": links_list, # This is now built from individual inputs
+            "quality": quality_tag, # General quality tag
+            "type": content_type, # New field for content type
             "overview": "No overview available.",
             "poster": "",
             "year": "N/A",
@@ -1023,5 +1062,25 @@ def delete_movie(movie_id):
     
     return redirect(url_for('admin')) # Redirect back to the admin page
 
+
+# New routes for navigation bar
+@app.route('/movies_only')
+def movies_only():
+    # Only fetches items marked as 'movie' type
+    movie_list = list(movies.find({"type": "movie"}).sort('_id', -1).limit(30))
+    for movie in movie_list:
+        movie['_id'] = str(movie['_id'])
+    return render_template_string(index_html, movies=movie_list, query="")
+
+@app.route('/webseries')
+def webseries():
+    # Only fetches items marked as 'series' type
+    series_list = list(movies.find({"type": "series"}).sort('_id', -1).limit(30))
+    for series in series_list:
+        series['_id'] = str(series['_id'])
+    return render_template_string(index_html, movies=series_list, query="")
+
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000, debug=True)
+
