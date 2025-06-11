@@ -482,43 +482,76 @@ detail_html = """
     margin-bottom: 30px;
   }
 
-  .action-buttons {
-    display: flex;
-    gap: 20px;
-    justify-content: center;
-    flex-wrap: wrap;
-    margin-top: 20px;
-  }
-  .action-button {
-    flex: 1;
-    min-width: 200px;
-    padding: 15px 20px;
-    border-radius: 8px;
+  /* --- DOWNLOAD LINKS SECTION --- */
+  .download-section {
+    width: 100%;
     text-align: center;
-    font-size: 20px;
+    margin-top: 30px;
+    background: #1f1f1f;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);
+  }
+  .download-section h3 {
+    font-size: 24px;
     font-weight: 700;
-    transition: background 0.3s ease;
+    color: #00ff00; /* Green color for heading */
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
   }
-  .watch-button {
-    background: #1db954;
-    color: #000;
+  .download-section h3::before,
+  .download-section h3::after {
+    content: '[↓]';
+    color: #00ff00;
+    font-size: 20px;
   }
-  .watch-button:hover {
-    background: #17a34a;
+
+  .download-item {
+    margin-bottom: 15px;
+  }
+  .download-quality-info {
+    font-size: 18px;
+    color: #ff9900; /* Orange color for quality info */
+    margin-bottom: 10px;
+    font-weight: 600;
+  }
+  .download-button-wrapper {
+    width: 100%;
+    max-width: 300px; /* Limit button width */
+    margin: 0 auto;
   }
   .download-button {
-    background: #e44d26;
+    display: block; /* Make button full width of its wrapper */
+    padding: 12px 20px;
+    border-radius: 30px; /* Pill shape */
+    background: linear-gradient(to right, #6a0dad, #8a2be2, #4b0082); /* Purple gradient */
     color: #fff;
+    font-size: 18px;
+    font-weight: 700;
+    text-align: center;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    border: none;
   }
   .download-button:hover {
-    background: #d43d16;
+    transform: translateY(-3px);
+    box-shadow: 0 6px 15px rgba(0,0,0,0.7);
+    background: linear-gradient(to right, #7b2dfc, #9a4beb, #5c1bb2); /* Slightly brighter purple */
   }
+
   .no-link-message {
       color: #999;
       font-size: 16px;
       text-align: center;
       width: 100%;
+      padding: 20px;
+      background: #1f1f1f;
+      border-radius: 8px;
   }
+
 
   /* Responsive Adjustments for Detail Page */
   @media (min-width: 769px) {
@@ -532,9 +565,7 @@ detail_html = """
       .detail-title {
           font-size: 44px;
       }
-      .action-buttons {
-          justify-content: flex-start;
-      }
+      /* No direct "action-buttons" anymore, removed specific style */
   }
 
   @media (max-width: 768px) {
@@ -547,14 +578,23 @@ detail_html = """
     .detail-title { font-size: 28px; }
     .detail-meta { font-size: 14px; gap: 10px; margin-bottom: 15px; }
     .detail-overview { font-size: 15px; margin-bottom: 20px; }
-    .action-button { font-size: 16px; padding: 12px 15px; min-width: 120px; gap: 10px; }
+    
+    .download-section h3 { font-size: 20px; }
+    .download-section h3::before,
+    .download-section h3::after { font-size: 18px; }
+    .download-quality-info { font-size: 16px; }
+    .download-button { font-size: 16px; padding: 10px 15px; }
   }
 
   @media (max-width: 480px) {
       .detail-title { font-size: 22px; }
       .detail-meta { font-size: 13px; }
       .detail-overview { font-size: 14px; }
-      .action-button { font-size: 14px; padding: 10px 12px; min-width: unset; flex: 1 1 45%; }
+      .download-section h3 { font-size: 18px; }
+      .download-section h3::before,
+      .download-section h3::after { font-size: 16px; }
+      .download-quality-info { font-size: 14px; }
+      .download-button { font-size: 14px; padding: 8px 12px; }
   }
 
   /* Bottom nav for consistency (same as index_html) */
@@ -610,13 +650,22 @@ detail_html = """
         </div>
     </div>
     
-    <div class="action-buttons">
-      {% if movie.link %}
-        <a class="action-button watch-button" href="{{ movie.link }}" target="_blank" rel="noopener">▶ Watch Now</a>
+    <div class="download-section">
+      <h3>Download Links</h3>
+      {% if movie.links and movie.links|length > 0 %}
+        {% for link_item in movie.links %}
+        <div class="download-item">
+          <p class="download-quality-info">({{ link_item.quality }}) [{{ link_item.size }}]</p>
+          <div class="download-button-wrapper">
+            <a class="download-button" href="{{ link_item.url }}" target="_blank" rel="noopener">Download</a>
+          </div>
+        </div>
+        {% endfor %}
       {% else %}
-        <p class="no-link-message">No watch/download link available yet.</p>
+        <p class="no-link-message">No download links available yet.</p>
       {% endif %}
     </div>
+
   </div>
   {% else %}
     <p style="text-align:center; color:#999; margin-top: 40px;">Movie not found.</p>
@@ -673,18 +722,20 @@ admin_html = """
       50% { background-position: 100% 50%; }
       100% { background-position: 0% 50%; }
     }
-    form { max-width: 400px; margin-bottom: 40px; border: 1px solid #333; padding: 20px; border-radius: 8px;}
-    input, button {
+    form { max-width: 600px; margin-bottom: 40px; border: 1px solid #333; padding: 20px; border-radius: 8px;}
+    input[type="text"], input[type="url"], button, textarea { /* Added textarea for better link input */
       width: 100%;
       padding: 10px;
       margin-bottom: 15px;
       border-radius: 5px;
       border: none;
       font-size: 16px;
-    }
-    input {
       background: #222;
       color: #eee;
+    }
+    textarea {
+        min-height: 80px; /* Make textarea taller */
+        resize: vertical;
     }
     button {
       background: #1db954;
@@ -743,9 +794,9 @@ admin_html = """
 <body>
   <h2>Add New Movie</h2>
   <form method="post">
-    <input name="title" placeholder="Movie Title" required />
-    <input name="link" placeholder="Watch/Download Link" />
-    <input name="quality" placeholder="Quality tag (e.g. HD, Hindi Dubbed, TRENDING)" />
+    <input type="text" name="title" placeholder="Movie Title" required />
+    <textarea name="link" placeholder="Download Links (Format: Quality:Size:URL, e.g., Bangla 480p:590MB:http://link1.com,Bangla 720p:1.4GB:http://link2.com)"></textarea>
+    <input type="text" name="quality" placeholder="Quality tag (e.g. HD, Hindi Dubbed, TRENDING)" />
     <button type="submit">Add Movie</button>
   </form>
 
@@ -871,12 +922,34 @@ def movie_detail(movie_id):
 def admin():
     if request.method == "POST":
         title = request.form.get("title")
-        link = request.form.get("link")
+        raw_link_input = request.form.get("link") # Changed from 'link' to 'raw_link_input'
         quality = request.form.get("quality", "").upper()
         
+        # New: Process raw_link_input into a list of link objects
+        links_list = []
+        if raw_link_input:
+            # Expected format for admin input: "Quality:Size:URL,Quality:Size:URL"
+            # Example: "Bangla 480p:590MB:http://link1.com,Bangla 720p:1.4GB:http://link2.com"
+            individual_links_str = raw_link_input.split(',')
+            for link_str in individual_links_str:
+                parts = link_str.strip().split(':', 2) # Split by ':' at most 2 times
+                if len(parts) == 3:
+                    links_list.append({
+                        "quality": parts[0].strip(),
+                        "size": parts[1].strip(),
+                        "url": parts[2].strip()
+                    })
+                elif len(parts) == 1 and parts[0].strip(): # Fallback for simple URL input
+                    links_list.append({
+                        "quality": "Unknown Quality", # Default quality if only URL given
+                        "size": "N/A",   # Default size
+                        "url": parts[0].strip()
+                    })
+
+
         movie_data = {
             "title": title,
-            "link": link or "",
+            "links": links_list, # Changed from 'link' to 'links' to store the list
             "quality": quality,
             "overview": "No overview available.",
             "poster": "",
@@ -898,7 +971,6 @@ def admin():
                     movie_data["overview"] = data.get("overview", "No overview available.")
                     movie_data["poster"] = f"https://image.tmdb.org/t/p/w500{data['poster_path']}" if data.get("poster_path") else ""
                     
-                    # Extract year from release_date or set N/A
                     release_date = data.get("release_date", "")
                     movie_data["year"] = release_date[:4] if release_date else "N/A"
                     
@@ -928,8 +1000,6 @@ def admin():
             return redirect(url_for('admin'))
         except Exception as e:
             print(f"Error inserting movie into MongoDB: {e}")
-            # Consider showing an error message on the admin page if insertion fails
-            # For simplicity, redirecting anyway for now.
             return redirect(url_for('admin'))
 
     # Fetch all movies for displaying in the admin panel
