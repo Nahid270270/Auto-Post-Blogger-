@@ -666,13 +666,14 @@ admin_html = """
       animation: gradientShift 10s ease infinite;
       display: inline-block;
       font-size: 28px;
+      margin-bottom: 20px; /* Added margin */
     }
     @keyframes gradientShift {
       0% { background-position: 0% 50%; }
       50% { background-position: 100% 50%; }
       100% { background-position: 0% 50%; }
     }
-    form { max-width: 400px; margin-top: 20px; }
+    form { max-width: 400px; margin-bottom: 40px; border: 1px solid #333; padding: 20px; border-radius: 8px;}
     input, button {
       width: 100%;
       padding: 10px;
@@ -695,16 +696,96 @@ admin_html = """
     button:hover {
       background: #17a34a;
     }
+
+    /* Styles for Movie List */
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+    }
+    th, td {
+        padding: 10px;
+        text-align: left;
+        border-bottom: 1px solid #333;
+    }
+    th {
+        background: #282828;
+        color: #eee;
+    }
+    td {
+        background: #181818;
+    }
+    .delete-btn {
+        background: #e44d26;
+        color: #fff;
+        padding: 5px 10px;
+        border-radius: 5px;
+        border: none;
+        cursor: pointer;
+        transition: background 0.3s ease;
+        font-size: 14px; /* Smaller font for table button */
+        width: auto; /* Override full width */
+        margin-bottom: 0; /* Remove bottom margin */
+    }
+    .delete-btn:hover {
+        background: #d43d16;
+    }
+    .movie-list-container {
+        max-width: 800px;
+        margin-top: 40px;
+        background: #181818;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 0 10px rgba(0,0,0,0.5);
+    }
   </style>
 </head>
 <body>
-  <h2>Add Movie</h2>
+  <h2>Add New Movie</h2>
   <form method="post">
     <input name="title" placeholder="Movie Title" required />
     <input name="link" placeholder="Watch/Download Link" />
     <input name="quality" placeholder="Quality tag (e.g. HD, Hindi Dubbed, TRENDING)" />
     <button type="submit">Add Movie</button>
   </form>
+
+  <hr>
+
+  <h2>Manage Existing Movies</h2>
+  <div class="movie-list-container">
+    {% if movies %}
+    <table>
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Quality</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for movie in movies %}
+        <tr>
+          <td>{{ movie.title }}</td>
+          <td>{{ movie.quality }}</td>
+          <td>
+            <button class="delete-btn" onclick="confirmDelete('{{ movie._id }}', '{{ movie.title }}')">Delete</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p style="text-align:center; color:#999;">No movies found in the database.</p>
+    {% endif %}
+  </div>
+
+  <script>
+    function confirmDelete(movieId, movieTitle) {
+      if (confirm('Are you sure you want to delete "' + movieTitle + '"?')) {
+        window.location.href = '/delete_movie/' + movieId;
+      }
+    }
+  </script>
 </body>
 </html>
 """
@@ -847,10 +928,30 @@ def admin():
             return redirect(url_for('admin'))
         except Exception as e:
             print(f"Error inserting movie into MongoDB: {e}")
-            return render_template_string(admin_html, error="Failed to add movie.")
+            # Consider showing an error message on the admin page if insertion fails
+            # For simplicity, redirecting anyway for now.
+            return redirect(url_for('admin'))
 
-    return render_template_string(admin_html)
+    # Fetch all movies for displaying in the admin panel
+    all_movies = list(movies.find().sort('_id', -1))
+    for movie in all_movies:
+        movie['_id'] = str(movie['_id']) # Convert ObjectId to string for template
+    return render_template_string(admin_html, movies=all_movies)
+
+
+@app.route('/delete_movie/<movie_id>')
+def delete_movie(movie_id):
+    try:
+        # Delete the movie from MongoDB using its ObjectId
+        result = movies.delete_one({"_id": ObjectId(movie_id)})
+        if result.deleted_count == 1:
+            print(f"Movie with ID {movie_id} deleted successfully!")
+        else:
+            print(f"Movie with ID {movie_id} not found.")
+    except Exception as e:
+        print(f"Error deleting movie with ID {movie_id}: {e}")
+    
+    return redirect(url_for('admin')) # Redirect back to the admin page
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000, debug=True)
-
