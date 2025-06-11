@@ -1096,6 +1096,10 @@ admin_html = """
     td {
         background: #181818;
     }
+    .action-buttons {
+        display: flex;
+        gap: 5px;
+    }
     .delete-btn {
         background: #e44d26;
         color: #fff;
@@ -1110,6 +1114,21 @@ admin_html = """
     }
     .delete-btn:hover {
         background: #d43d16;
+    }
+    .edit-btn {
+        background: #007bff; /* Blue color for edit */
+        color: #fff;
+        padding: 5px 10px;
+        border-radius: 5px;
+        text-decoration: none;
+        font-size: 14px;
+        width: auto;
+        margin-bottom: 0;
+        display: inline-block; /* Allows padding and margin */
+        transition: background 0.3s ease;
+    }
+    .edit-btn:hover {
+        background: #0056b3;
     }
     .movie-list-container {
         max-width: 800px;
@@ -1225,7 +1244,8 @@ admin_html = """
           <td>{{ movie.quality }}</td>
           <td>{% if movie.quality == 'TRENDING' %}Yes{% else %}No{% endif %}</td>
           <td>{% if movie.is_coming_soon %}Yes{% else %}No{% endif %}</td>
-          <td>
+          <td class="action-buttons">
+            <a href="{{ url_for('edit_movie', movie_id=movie._id) }}" class="edit-btn">Edit</a>
             <button class="delete-btn" onclick="confirmDelete('{{ movie._id }}', '{{ movie.title }}')">Delete</button>
           </td>
         </tr>
@@ -1248,6 +1268,175 @@ admin_html = """
 </html>
 """
 # --- END OF admin_html TEMPLATE ---
+
+
+# --- START OF edit_html TEMPLATE ---
+edit_html = """
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Edit Content - MovieZone</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #121212; color: #eee; padding: 20px; }
+    h2 { 
+      background: linear-gradient(270deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #9400d3);
+      background-size: 400% 400%;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: gradientShift 10s ease infinite;
+      display: inline-block;
+      font-size: 28px;
+      margin-bottom: 20px;
+    }
+    @keyframes gradientShift {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    form { max-width: 600px; margin-bottom: 40px; border: 1px solid #333; padding: 20px; border-radius: 8px;}
+    
+    .form-group {
+        margin-bottom: 15px;
+    }
+    .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+        color: #ddd;
+    }
+    input[type="text"], input[type="url"], textarea, button, select {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 15px;
+      border-radius: 5px;
+      border: none;
+      font-size: 16px;
+      background: #222;
+      color: #eee;
+    }
+    input[type="checkbox"] {
+        width: auto;
+        margin-right: 10px;
+    }
+    textarea {
+        resize: vertical;
+        min-height: 80px;
+    }
+    .link-input-group input[type="url"] {
+        margin-bottom: 5px;
+    }
+    .link-input-group p {
+        font-size: 14px;
+        color: #bbb;
+        margin-bottom: 5px;
+    }
+
+    button {
+      background: #1db954;
+      color: #000;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+    button:hover {
+      background: #17a34a;
+    }
+    .back-to-admin {
+        display: inline-block;
+        margin-bottom: 20px;
+        color: #1db954;
+        text-decoration: none;
+        font-weight: bold;
+    }
+    .back-to-admin:hover {
+        text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <a href="{{ url_for('admin') }}" class="back-to-admin">&larr; Back to Admin Panel</a>
+  <h2>Edit Content: {{ movie.title }}</h2>
+  <form method="post">
+    <div class="form-group">
+        <label for="title">Movie/Series Title:</label>
+        <input type="text" name="title" id="title" placeholder="Movie or Series Title" value="{{ movie.title }}" required />
+    </div>
+
+    <div class="form-group">
+        <label for="content_type">Content Type:</label>
+        <select name="content_type" id="content_type">
+            <option value="movie" {% if movie.type == 'movie' %}selected{% endif %}>Movie</option>
+            <option value="series" {% if movie.type == 'series' %}selected{% endif %}>TV Series / Web Series</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label>Download Links (only paste URL):</label>
+        <div class="link-input-group">
+            <p>480p Download Link [Approx. 590MB]:</p>
+            <input type="url" name="link_480p" placeholder="Enter 480p download link" value="{% for link in movie.links %}{% if link.quality == '480p' %}{{ link.url }}{% endif %}{% endfor %}" />
+        </div>
+        <div class="link-input-group">
+            <p>720p Download Link [Approx. 1.4GB]:</p>
+            <input type="url" name="link_720p" placeholder="Enter 720p download link" value="{% for link in movie.links %}{% if link.quality == '720p' %}{{ link.url }}{% endif %}{% endfor %}" />
+        </div>
+        <div class="link-input-group">
+            <p>1080p Download Link [Approx. 2.9GB]:</p>
+            <input type="url" name="link_1080p" placeholder="Enter 1080p download link" value="{% for link in movie.links %}{% if link.quality == '1080p' %}{{ link.url }}{% endif %}{% endfor %}" />
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label for="quality">Quality Tag (e.g., HD, Hindi Dubbed):</label>
+        <input type="text" name="quality" id="quality" placeholder="Quality tag" value="{{ movie.quality }}" />
+    </div>
+
+    <div class="form-group">
+        <label for="top_label">Poster Top Label (Optional, e.g., Special Offer, New):</label>
+        <input type="text" name="top_label" id="top_label" placeholder="Custom label on poster top" value="{{ movie.top_label }}" />
+    </div>
+
+    <div class="form-group">
+        <input type="checkbox" name="is_trending" id="is_trending" value="true" {% if movie.quality == 'TRENDING' %}checked{% endif %}>
+        <label for="is_trending" style="display: inline-block;">Is Trending?</label>
+    </div>
+
+    <div class="form-group">
+        <input type="checkbox" name="is_coming_soon" id="is_coming_soon" value="true" {% if movie.is_coming_soon %}checked{% endif %}>
+        <label for="is_coming_soon" style="display: inline-block;">Is Coming Soon?</label>
+    </div>
+
+    <div class="form-group">
+        <label for="overview">Overview (Optional - used if TMDb info not found):</label>
+        <textarea name="overview" id="overview" rows="5" placeholder="Enter movie/series overview or synopsis">{{ movie.overview }}</textarea>
+    </div>
+
+    <div class="form-group">
+        <label for="poster_url">Poster URL (Optional - direct image link, used if TMDb info not found):</label>
+        <input type="url" name="poster_url" id="poster_url" placeholder="e.g., https://example.com/poster.jpg" value="{{ movie.poster }}" />
+    </div>
+
+    <div class="form-group">
+        <label for="year">Release Year (Optional - used if TMDb info not found):</label>
+        <input type="text" name="year" id="year" placeholder="e.g., 2023" value="{{ movie.year }}" />
+    </div>
+
+    <div class="form-group">
+        <label for="original_language">Original Language (Optional - used if TMDb info not found):</label>
+        <input type="text" name="original_language" id="original_language" placeholder="e.g., Bengali, English" value="{{ movie.original_language }}" />
+    </div>
+
+    <div class="form-group">
+        <label for="genres">Genres (Optional - comma-separated, used if TMDb info not found):</label>
+        <input type="text" name="genres" id="genres" placeholder="e.g., Action, Drama, Thriller" value="{{ movie.genres | join(', ') }}" />
+    </div>
+    
+    <button type="submit">Update Content</button>
+  </form>
+</body>
+</html>
+"""
+# --- END OF edit_html TEMPLATE ---
 
 @app.route('/')
 def home():
@@ -1290,7 +1479,7 @@ def home():
         coming_soon_movies_list = list(coming_soon_result)
 
     # Convert ObjectIds to strings for all fetched lists
-    for m in movies_list + trending_movies_list + latest_movies_list + latest_movies_list + latest_series_list + coming_soon_movies_list:
+    for m in movies_list + trending_movies_list + latest_movies_list + latest_series_list + coming_soon_movies_list:
         m['_id'] = str(m['_id']) 
 
     return render_template_string(
@@ -1501,6 +1690,113 @@ def admin():
     for content in all_content:
         content['_id'] = str(content['_id']) # Convert ObjectId to string for template
     return render_template_string(admin_html, movies=all_content)
+
+
+@app.route('/edit_movie/<movie_id>', methods=["GET", "POST"])
+def edit_movie(movie_id):
+    try:
+        movie = movies.find_one({"_id": ObjectId(movie_id)})
+        if not movie:
+            return "Movie not found!", 404
+
+        if request.method == "POST":
+            # Extract updated data from form
+            title = request.form.get("title")
+            content_type = request.form.get("content_type", "movie")
+            quality_tag = request.form.get("quality", "").upper()
+            
+            links_list = []
+            link_480p = request.form.get("link_480p")
+            if link_480p:
+                links_list.append({"quality": "480p", "size": "590MB", "url": link_480p})
+            link_720p = request.form.get("link_720p")
+            if link_720p:
+                links_list.append({"quality": "720p", "size": "1.4GB", "url": link_720p})
+            link_1080p = request.form.get("link_1080p")
+            if link_1080p:
+                links_list.append({"quality": "1080p", "size": "2.9GB", "url": link_1080p})
+            
+            manual_overview = request.form.get("overview")
+            manual_poster_url = request.form.get("poster_url")
+            manual_year = request.form.get("year")
+            manual_original_language = request.form.get("original_language")
+            manual_genres_str = request.form.get("genres")
+            manual_top_label = request.form.get("top_label")
+            is_trending = request.form.get("is_trending") == "true"
+            is_coming_soon = request.form.get("is_coming_soon") == "true"
+
+            manual_genres_list = [g.strip() for g in manual_genres_str.split(',') if g.strip()] if manual_genres_str else []
+
+            if is_trending:
+                quality_tag = "TRENDING"
+            
+            # Prepare updated data for MongoDB
+            updated_data = {
+                "title": title,
+                "links": links_list,
+                "quality": quality_tag,
+                "type": content_type,
+                "overview": manual_overview if manual_overview else "No overview available.",
+                "poster": manual_poster_url if manual_poster_url else "",
+                "year": manual_year if manual_year else "N/A",
+                "release_date": manual_year if manual_year else "N/A", # Assuming release_date is same as year if manually entered
+                "original_language": manual_original_language if manual_original_language else "N/A",
+                "genres": manual_genres_list,
+                "top_label": manual_top_label if manual_top_label else "",
+                "is_coming_soon": is_coming_soon
+            }
+
+            # If TMDb API Key is available and no manual overview/poster provided, fetch and update
+            if TMDB_API_KEY and (not manual_poster_url and not manual_overview): # Only try to fetch if not manually overridden
+                tmdb_search_type = "movie" if content_type == "movie" else "tv"
+                tmdb_url = f"https://api.themoviedb.org/3/search/{tmdb_search_type}?api_key={TMDB_API_KEY}&query={title}"
+                try:
+                    res = requests.get(tmdb_url, timeout=5).json()
+                    if res and "results" in res and res["results"]:
+                        data = res["results"][0]
+                        # Only update if TMDb provides a value and manual data wasn't explicitly provided
+                        if not manual_overview and data.get("overview"):
+                            updated_data["overview"] = data.get("overview")
+                        if not manual_poster_url and data.get("poster_path"):
+                            updated_data["poster"] = f"https://image.tmdb.org/t/p/w500{data['poster_path']}"
+                        
+                        release_date = data.get("release_date") if tmdb_search_type == "movie" else data.get("first_air_date")
+                        if not manual_year and release_date:
+                            updated_data["year"] = release_date[:4]
+                            updated_data["release_date"] = release_date
+                        
+                        updated_data["vote_average"] = data.get("vote_average", movie.get("vote_average")) # Keep old if TMDb doesn't provide
+                        if not manual_original_language and data.get("original_language"):
+                            updated_data["original_language"] = data.get("original_language")
+                        
+                        genres_names = []
+                        for genre_id in data.get("genre_ids", []):
+                            if genre_id in TMDb_Genre_Map:
+                                genres_names.append(TMDb_Genre_Map[genre_id])
+                        if not manual_genres_list and genres_names:
+                            updated_data["genres"] = genres_names
+                        
+                        updated_data["tmdb_id"] = data.get("id")
+                    else:
+                        print(f"No results found on TMDb for title: {title} ({tmdb_search_type}) during edit.")
+                except requests.exceptions.RequestException as e:
+                    print(f"Error connecting to TMDb API for '{title}' during edit: {e}")
+                except Exception as e:
+                    print(f"An unexpected error occurred while fetching TMDb data during edit: {e}")
+            
+            # Update the movie in MongoDB
+            movies.update_one({"_id": ObjectId(movie_id)}, {"$set": updated_data})
+            print(f"Content '{title}' updated successfully!")
+            return redirect(url_for('admin')) # Redirect back to admin list after update
+
+        else: # GET request, display the form
+            # Convert ObjectId to string for template
+            movie['_id'] = str(movie['_id']) 
+            return render_template_string(edit_html, movie=movie)
+
+    except Exception as e:
+        print(f"Error processing edit for movie ID {movie_id}: {e}")
+        return "An error occurred during editing.", 500
 
 
 @app.route('/delete_movie/<movie_id>')
