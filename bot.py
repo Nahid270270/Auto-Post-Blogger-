@@ -1105,7 +1105,7 @@ admin_html = """
         font-weight: bold;
         color: #ddd;
     }
-    input[type="text"], input[type="url"], textarea, button, select, input[type="number"] { /* Added select for dropdown */
+    input[type="text"], input[type="url"], textarea, button, select, input[type="number"], input[type="search"] { /* Added input[type="search"] */
       width: 100%;
       padding: 10px;
       margin-bottom: 15px;
@@ -1141,6 +1141,22 @@ admin_html = """
     }
     button:hover {
       background: #17a34a;
+    }
+
+    .search-form {
+        max-width: 800px; /* Adjust width for search form */
+        margin-bottom: 20px; /* Space between search and table */
+        display: flex;
+        gap: 10px;
+        align-items: flex-end;
+    }
+    .search-form input[type="search"] {
+        margin-bottom: 0; /* Remove extra margin */
+    }
+    .search-form button {
+        margin-bottom: 0; /* Remove extra margin */
+        padding: 10px 20px;
+        flex-shrink: 0;
     }
 
     table {
@@ -1296,6 +1312,13 @@ admin_html = """
   <hr>
 
   <h2>Manage Existing Content</h2>
+  
+  {# Admin Search Form Added Here #}
+  <form method="GET" class="search-form">
+    <input type="search" name="search_query" placeholder="Search content by title..." value="{{ search_query|default('') }}" />
+    <button type="submit">Search</button>
+  </form>
+
   <div class="movie-list-container">
     {% if movies %}
     <table>
@@ -1326,7 +1349,7 @@ admin_html = """
       </tbody>
     </table>
     {% else %}
-    <p style="text-align:center; color:#999;">No content found in the database.</p>
+    <p style="text-align:center; color:#999;">{% if search_query %}No content found for "{{ search_query }}".{% else %}No content found in the database.{% endif %}</p>
     {% endif %}
   </div>
 
@@ -1975,10 +1998,16 @@ def admin():
             return redirect(url_for('admin'))
 
     # Fetch all content for displaying in the admin panel
-    all_content = list(movies.find().sort('_id', -1))
+    search_query = request.args.get('search_query')
+    if search_query:
+        # Perform case-insensitive search on title
+        all_content = list(movies.find({"title": {"$regex": search_query, "$options": "i"}}).sort('_id', -1))
+    else:
+        all_content = list(movies.find().sort('_id', -1))
+    
     for content in all_content:
         content['_id'] = str(content['_id']) # Convert ObjectId to string for template
-    return render_template_string(admin_html, movies=all_content)
+    return render_template_string(admin_html, movies=all_content, search_query=search_query)
 
 
 @app.route('/edit_movie/<movie_id>', methods=["GET", "POST"])
@@ -2175,3 +2204,4 @@ def coming_soon():
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000, debug=True)
+
