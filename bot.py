@@ -337,7 +337,7 @@ index_html = """
     <i class="fas fa-film"></i>
     <span>Movie</span>
   </a>
-  <a href="YOUR_TELEGRAM_GROUP_LINK" class="nav-item" target="_blank" rel="noopener">
+  <a href="https://t.me/Movie_Request_Group_23" class="nav-item" target="_blank" rel="noopener">
     <i class="fas fa-plus-circle"></i>
     <span>Request</span>
   </a>
@@ -680,7 +680,7 @@ detail_html = """
     <i class="fas fa-film"></i>
     <span>Movie</span>
   </a>
-  <a href="YOUR_TELEGRAM_GROUP_LINK" class="nav-item" target="_blank" rel="noopener">
+  <a href="https://t.me/Movie_Request_Group_23" class="nav-item" target="_blank" rel="noopener">
     <i class="fas fa-plus-circle"></i>
     <span>Request</span>
   </a>
@@ -697,190 +697,6 @@ detail_html = """
 </html>
 """
 # --- END OF detail_html TEMPLATE ---
-
-
-# --- START OF admin_html TEMPLATE ---
-admin_html = """
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Admin Panel - Movie Dokan</title>
-  <style>
-    body { font-family: Arial, sans-serif; background: #121212; color: #eee; padding: 20px; }
-    h2 { 
-      background: linear-gradient(270deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #9400d3);
-      background-size: 400% 400%;
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      animation: gradientShift 10s ease infinite;
-      display: inline-block;
-      font-size: 28px;
-      margin-bottom: 20px; /* Added margin */
-    }
-    @keyframes gradientShift {
-      0% { background-position: 0% 50%; }
-      50% { background-position: 100% 50%; }
-      100% { background-position: 0% 50%; }
-    }
-    form { max-width: 600px; margin-bottom: 40px; border: 1px solid #333; padding: 20px; border-radius: 8px;}
-    
-    /* Input field specific styles */
-    .form-group {
-        margin-bottom: 15px;
-    }
-    .form-group label {
-        display: block;
-        margin-bottom: 5px;
-        font-weight: bold;
-        color: #ddd;
-    }
-    input[type="text"], input[type="url"], button {
-      width: 100%;
-      padding: 10px;
-      margin-bottom: 15px; /* Adjust this if form-group already has margin */
-      border-radius: 5px;
-      border: none;
-      font-size: 16px;
-      background: #222;
-      color: #eee;
-    }
-    /* Specific input for the link section */
-    .link-input-group input[type="url"] {
-        margin-bottom: 5px; /* Smaller margin between link inputs */
-    }
-    .link-input-group p {
-        font-size: 14px;
-        color: #bbb;
-        margin-bottom: 5px;
-    }
-
-    button {
-      background: #1db954;
-      color: #000;
-      font-weight: 700;
-      cursor: pointer;
-      transition: background 0.3s ease;
-    }
-    button:hover {
-      background: #17a34a;
-    }
-
-    /* Styles for Movie List */
-    table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 20px;
-    }
-    th, td {
-        padding: 10px;
-        text-align: left;
-        border-bottom: 1px solid #333;
-    }
-    th {
-        background: #282828;
-        color: #eee;
-    }
-    td {
-        background: #181818;
-    }
-    .delete-btn {
-        background: #e44d26;
-        color: #fff;
-        padding: 5px 10px;
-        border-radius: 5px;
-        border: none;
-        cursor: pointer;
-        transition: background 0.3s ease;
-        font-size: 14px; /* Smaller font for table button */
-        width: auto; /* Override full width */
-        margin-bottom: 0; /* Remove bottom margin */
-    }
-    .delete-btn:hover {
-        background: #d43d16;
-    }
-    .movie-list-container {
-        max-width: 800px;
-        margin-top: 40px;
-        background: #181818;
-        padding: 20px;
-        border-radius: 8px;
-        box-shadow: 0 0 10px rgba(0,0,0,0.5);
-    }
-  </style>
-</head>
-<body>
-  <h2>Add New Movie</h2>
-  <form method="post">
-    <div class="form-group">
-        <label for="title">Movie Title:</label>
-        <input type="text" name="title" id="title" placeholder="Movie Title" required />
-    </div>
-
-    <div class="form-group">
-        <label>Download Links (only paste URL):</label>
-        <div class="link-input-group">
-            <p>Bangla 480p [590MB]:</p>
-            <input type="url" name="link_480p" placeholder="Enter 480p download link" />
-        </div>
-        <div class="link-input-group">
-            <p>Bangla 720p [1.4GB]:</p>
-            <input type="url" name="link_720p" placeholder="Enter 720p download link" />
-        </div>
-        <div class="link-input-group">
-            <p>Bangla 1080p [2.9GB]:</p>
-            <input type="url" name="link_1080p" placeholder="Enter 1080p download link" />
-        </div>
-        </div>
-
-    <div class="form-group">
-        <label for="quality">Quality Tag (e.g., HD, Hindi Dubbed, TRENDING):</label>
-        <input type="text" name="quality" id="quality" placeholder="Quality tag" />
-    </div>
-    
-    <button type="submit">Add Movie</button>
-  </form>
-
-  <hr>
-
-  <h2>Manage Existing Movies</h2>
-  <div class="movie-list-container">
-    {% if movies %}
-    <table>
-      <thead>
-        <tr>
-          <th>Title</th>
-          <th>Quality</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for movie in movies %}
-        <tr>
-          <td>{{ movie.title }}</td>
-          <td>{{ movie.quality }}</td>
-          <td>
-            <button class="delete-btn" onclick="confirmDelete('{{ movie._id }}', '{{ movie.title }}')">Delete</button>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <p style="text-align:center; color:#999;">No movies found in the database.</p>
-    {% endif %}
-  </div>
-
-  <script>
-    function confirmDelete(movieId, movieTitle) {
-      if (confirm('Are you sure you want to delete "' + movieTitle + '"?')) {
-        window.location.href = '/delete_movie/' + movieId;
-      }
-    }
-  </script>
-</body>
-</html>
-"""
-# --- END OF admin_html TEMPLATE ---
 
 @app.route('/')
 def home():
@@ -968,15 +784,15 @@ def admin():
         
         link_480p = request.form.get("link_480p")
         if link_480p:
-            links_list.append({"quality": "Bangla 480p", "size": "590MB", "url": link_480p})
+            links_list.append({"quality": "480p", "size": "590MB", "url": link_480p})
             
         link_720p = request.form.get("link_720p")
         if link_720p:
-            links_list.append({"quality": "Bangla 720p", "size": "1.4GB", "url": link_720p})
+            links_list.append({"quality": "720p", "size": "1.4GB", "url": link_720p})
             
         link_1080p = request.form.get("link_1080p")
         if link_1080p:
-            links_list.append({"quality": "Bangla 1080p", "size": "2.9GB", "url": link_1080p})
+            links_list.append({"quality": "1080p", "size": "2.9GB", "url": link_1080p})
         
         # Determine if it's a movie or web series. Default to movie.
         # You might want a dedicated field for this in admin_html later.
