@@ -36,6 +36,7 @@ TMDb_Genre_Map = {
 }
 
 # --- START OF index_html TEMPLATE ---
+# (The updated index_html template will go here as a multi-line string)
 index_html = """
 <!DOCTYPE html>
 <html lang="en">
@@ -148,10 +149,42 @@ index_html = """
   /* Movie Grid and Card Styles */
   .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill,minmax(180px,1fr)); /* Default: around 3-4 columns */
+    grid-auto-flow: column; /* Changed to flow horizontally */
+    grid-auto-columns: minmax(180px, 1fr); /* Set column width for horizontal flow */
     gap: 20px;
     margin-bottom: 40px; /* Space after each grid section */
+    overflow-x: auto; /* Enable horizontal scrolling */
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+    scroll-snap-type: x mandatory; /* Snap to items */
+    padding-bottom: 10px; /* Add padding for scrollbar */
   }
+
+  /* Hide scrollbar for Chrome, Safari and Opera */
+  .grid::-webkit-scrollbar {
+    display: none;
+  }
+  /* Hide scrollbar for IE, Edge and Firefox */
+  .grid {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+
+  /* Specific styles for auto-scrolling grids */
+  .auto-scroll-grid {
+      animation: scrollGrid 30s linear infinite; /* Adjust duration as needed */
+  }
+  .auto-scroll-grid:hover {
+      animation-play-state: paused; /* Pause animation on hover */
+  }
+  /* Keyframe for auto-scrolling */
+  @keyframes scrollGrid {
+      0% { transform: translateX(0); }
+      /* This scrolls the entire content. For a seamless loop, you'd typically duplicate items. */
+      /* For now, it scrolls to the end of the content. Adjust value if needed. */
+      100% { transform: translateX(calc(-100% + 100vw - 30px)); } /* Scrolls enough to show new items, considering viewport width */
+      /* 100vw - 30px is an approximation of viewport width minus main padding */
+  }
+
   .movie-card {
     background: #181818; /* Dark card background */
     border-radius: 8px;
@@ -161,6 +194,8 @@ index_html = """
     position: relative; /* Crucial for positioning child elements */
     cursor: pointer;
     border: 2px solid transparent; /* Initial transparent border for smooth transition */
+    scroll-snap-align: start; /* Snap to start of item */
+    flex-shrink: 0; /* Ensure cards don't shrink */
   }
   /* RGB border animation on hover */
   .movie-card:hover {
@@ -291,9 +326,6 @@ index_html = """
 
   .overview { display: none; } /* Overview hidden by default in card view */
 
-  /* Trending Header (Removed - replaced by .category-header) */
-  /* .trending-header { ... } */
-
   /* Mobile adjustments - START */
   @media (max-width: 768px) {
     header { padding: 8px 15px; }
@@ -307,40 +339,48 @@ index_html = """
     .category-header .see-all-btn { padding: 6px 10px; font-size: 12px; }
 
     .grid { 
-        grid-template-columns: repeat(auto-fill,minmax(90px,1fr)); /* 3 columns on mobile (approx. 90px width) */
+        grid-template-columns: none; /* Disable fixed grid columns */
+        grid-auto-flow: column; /* Ensure horizontal flow */
+        grid-auto-columns: minmax(130px, 1fr); /* Slightly larger columns for mobile */
         gap: 10px;
         margin-bottom: 30px;
     }
     .movie-card { box-shadow: 0 0 5px rgba(0,0,0,0.5); }
-    .movie-poster { height: 130px; } /* Smaller height for mobile posters */
+    .movie-poster { height: 180px; } /* Larger height for mobile posters */
     .movie-info { padding: 8px; background: rgba(0, 0, 0, 0.7); }
-    .movie-title { font-size: 12px; margin: 0 0 2px 0; }
-    .movie-year { font-size: 10px; margin-bottom: 4px; }
+    .movie-title { font-size: 14px; margin: 0 0 2px 0; } /* Larger font for mobile */
+    .movie-year { font-size: 11px; margin-bottom: 4px; }
     .badge { 
-        font-size: 9px; padding: 1px 4px; top: 5px; right: -15px; /* Adjust for smaller screens */
+        font-size: 10px; padding: 2px 5px; top: 8px; right: -15px; /* Adjust for smaller screens */
         transform: rotate(45deg); /* Keep rotation */
-        width: 80px; /* Smaller width for mobile badge */
+        width: 90px; /* Smaller width for mobile badge */
     }
     .overlay-text {
-        padding: 5px; /* Smaller padding on mobile */
+        padding: 8px; /* Smaller padding on mobile */
     }
     .label-badge {
-        font-size: 10px;
-        padding: 2px 5px;
-        margin-bottom: 3px;
+        font-size: 11px;
+        padding: 3px 6px;
+        margin-bottom: 4px;
     }
     .label-badge.coming-soon-badge {
-        font-size: 9px;
-        padding: 3px 6px;
+        font-size: 10px;
+        padding: 3px 7px;
     }
     .movie-top-title {
-        font-size: 12px;
+        font-size: 13px;
+    }
+
+    /* Mobile specific auto-scroll keyframe adjustment */
+    @keyframes scrollGrid {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(calc(-100% + 100vw - 20px)); } /* 100vw - 20px for mobile main padding */
     }
   }
 
   @media (max-width: 480px) {
-      .grid { grid-template-columns: repeat(auto-fill,minmax(80px,1fr)); } /* Even smaller min width for very small screens */
-      .movie-poster { height: 110px; }
+      .grid { grid-auto-columns: minmax(120px,1fr); } /* Even smaller min width for very small screens */
+      .movie-poster { height: 160px; } /* Adjust height for very small screens */
   }
   /* Mobile adjustments - END */
 
@@ -390,7 +430,7 @@ index_html = """
     {% if movies|length == 0 %}
       <p style="text-align:center; color:#999; margin-top: 40px;">No movies found for your search.</p>
     {% else %}
-      <div class="grid">
+      <div class="grid"> {# Search results grid should not auto-scroll #}
         {% for m in movies %}
         <a href="{{ url_for('movie_detail', movie_id=m._id) }}" class="movie-card">
           {% if m.poster %}
@@ -431,7 +471,7 @@ index_html = """
     {% if trending_movies|length == 0 %}
       <p style="text-align:center; color:#999;">No trending movies found.</p>
     {% else %}
-      <div class="grid">
+      <div class="grid auto-scroll-grid"> {# Apply auto-scroll-grid class here #}
         {% for m in trending_movies %}
         <a href="{{ url_for('movie_detail', movie_id=m._id) }}" class="movie-card">
           {% if m.poster %}
@@ -472,7 +512,7 @@ index_html = """
     {% if latest_movies|length == 0 %}
       <p style="text-align:center; color:#999;">No movies found.</p>
     {% else %}
-      <div class="grid">
+      <div class="grid auto-scroll-grid"> {# Apply auto-scroll-grid class here #}
         {% for m in latest_movies %}
         <a href="{{ url_for('movie_detail', movie_id=m._id) }}" class="movie-card">
           {% if m.poster %}
@@ -513,7 +553,7 @@ index_html = """
     {% if latest_series|length == 0 %}
       <p style="text-align:center; color:#999;">No TV series or web series found.</p>
     {% else %}
-      <div class="grid">
+      <div class="grid auto-scroll-grid"> {# Apply auto-scroll-grid class here #}
         {% for m in latest_series %}
         <a href="{{ url_for('movie_detail', movie_id=m._id) }}" class="movie-card">
           {% if m.poster %}
@@ -554,7 +594,7 @@ index_html = """
     {% if coming_soon_movies|length == 0 %}
       <p style="text-align:center; color:#999;">No upcoming movies found.</p>
     {% else %}
-      <div class="grid">
+      <div class="grid auto-scroll-grid"> {# Apply auto-scroll-grid class here #}
         {% for m in coming_soon_movies %}
         <a href="{{ url_for('movie_detail', movie_id=m._id) }}" class="movie-card">
           {% if m.poster %}
