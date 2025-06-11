@@ -36,6 +36,7 @@ TMDb_Genre_Map = {
 }
 
 # --- START OF index_html TEMPLATE ---
+# (আপনার index_html কোড এখানে থাকবে, যা আগের মতো)
 index_html = """
 <!DOCTYPE html>
 <html lang="en">
@@ -169,20 +170,17 @@ index_html = """
   }
 
   /* Specific styles for auto-scrolling grids */
-  .auto-scroll-grid {
-      animation: scrollGrid 30s linear infinite; /* Adjust duration as needed */
+  /* .auto-scroll-grid {
+      animation: scrollGrid 30s linear infinite;
   }
   .auto-scroll-grid:hover {
-      animation-play-state: paused; /* Pause animation on hover */
-  }
+      animation-play-state: paused;
+  } */
   /* Keyframe for auto-scrolling */
-  @keyframes scrollGrid {
+  /* @keyframes scrollGrid {
       0% { transform: translateX(0); }
-      /* This scrolls the entire content. For a seamless loop, you'd typically duplicate items. */
-      /* For now, it scrolls to the end of the content. Adjust value if needed. */
-      100% { transform: translateX(calc(-100% + 100vw - 30px)); } /* Scrolls enough to show new items, considering viewport width */
-      /* 100vw - 30px is an approximation of viewport width minus main padding */
-  }
+      100% { transform: translateX(calc(-100% + 100vw - 30px)); }
+  } */
 
   .movie-card {
     background: #181818; /* Dark card background */
@@ -371,10 +369,10 @@ index_html = """
     }
 
     /* Mobile specific auto-scroll keyframe adjustment */
-    @keyframes scrollGrid {
+    /* @keyframes scrollGrid {
       0% { transform: translateX(0); }
-      100% { transform: translateX(calc(-100% + 100vw - 20px)); } /* 100vw - 20px for mobile main padding */
-    }
+      100% { transform: translateX(calc(-100% + 100vw - 20px)); }
+    } */
   }
 
   @media (max-width: 480px) {
@@ -470,7 +468,7 @@ index_html = """
     {% if trending_movies|length == 0 %}
       <p style="text-align:center; color:#999;">No trending movies found.</p>
     {% else %}
-      <div class="grid auto-scroll-grid"> {# Apply auto-scroll-grid class here #}
+      <div class="grid"> {# Apply auto-scroll-grid class here #}
         {% for m in trending_movies %}
         <a href="{{ url_for('movie_detail', movie_id=m._id) }}" class="movie-card">
           {% if m.poster %}
@@ -511,7 +509,7 @@ index_html = """
     {% if latest_movies|length == 0 %}
       <p style="text-align:center; color:#999;">No movies found.</p>
     {% else %}
-      <div class="grid auto-scroll-grid"> {# Apply auto-scroll-grid class here #}
+      <div class="grid"> {# Apply auto-scroll-grid class here #}
         {% for m in latest_movies %}
         <a href="{{ url_for('movie_detail', movie_id=m._id) }}" class="movie-card">
           {% if m.poster %}
@@ -552,7 +550,7 @@ index_html = """
     {% if latest_series|length == 0 %}
       <p style="text-align:center; color:#999;">No TV series or web series found.</p>
     {% else %}
-      <div class="grid auto-scroll-grid"> {# Apply auto-scroll-grid class here #}
+      <div class="grid"> {# Apply auto-scroll-grid class here #}
         {% for m in latest_series %}
         <a href="{{ url_for('movie_detail', movie_id=m._id) }}" class="movie-card">
           {% if m.poster %}
@@ -593,7 +591,7 @@ index_html = """
     {% if coming_soon_movies|length == 0 %}
       <p style="text-align:center; color:#999;">No upcoming movies found.</p>
     {% else %}
-      <div class="grid auto-scroll-grid"> {# Apply auto-scroll-grid class here #}
+      <div class="grid"> {# Apply auto-scroll-grid class here #}
         {% for m in coming_soon_movies %}
         <a href="{{ url_for('movie_detail', movie_id=m._id) }}" class="movie-card">
           {% if m.poster %}
@@ -651,6 +649,7 @@ index_html = """
 
 
 # --- START OF detail_html TEMPLATE ---
+# (আপনার detail_html কোড এখানে থাকবে, যা আগের মতো)
 detail_html = """
 <!DOCTYPE html>
 <html lang="en">
@@ -845,7 +844,7 @@ detail_html = """
   .download-button:hover {
     transform: translateY(-3px);
     box-shadow: 0 6px 15px rgba(0,0,0,0.7);
-    background: linear-gradient(to right, #7b2dfc, #9a4beb, #5c1bb2); /* Slightly brighter purple */
+    background: linear-gradient(to right, #7b2df2, #9a4beb, #5c1bb2); /* Slightly brighter purple */
   }
 
   .no-link-message {
@@ -1008,6 +1007,7 @@ detail_html = """
 
 
 # --- START OF admin_html TEMPLATE ---
+# (আপনার admin_html কোড এখানে থাকবে, যা আগের মতো)
 admin_html = """
 <!DOCTYPE html>
 <html>
@@ -1271,6 +1271,7 @@ admin_html = """
 
 
 # --- START OF edit_html TEMPLATE ---
+# (আপনার edit_html কোড এখানে থাকবে, যা আগের মতো)
 edit_html = """
 <!DOCTYPE html>
 <html>
@@ -1438,6 +1439,7 @@ edit_html = """
 """
 # --- END OF edit_html TEMPLATE ---
 
+
 @app.route('/')
 def home():
     query = request.args.get('q')
@@ -1453,9 +1455,9 @@ def home():
         result = movies.find({"title": {"$regex": query, "$options": "i"}})
         movies_list = list(result)
     else:
-        # Fetch data for each category on the homepage
+        # Fetch data for each category on the homepage with a limit of 6
         # Trending (quality == 'TRENDING')
-        trending_movies_result = movies.find({"quality": "TRENDING"}).sort('_id', -1).limit(12)
+        trending_movies_result = movies.find({"quality": "TRENDING"}).sort('_id', -1).limit(6) # .limit(6) added here
         trending_movies_list = list(trending_movies_result)
 
         # Latest Movies (type == 'movie', not trending, not coming soon)
@@ -1463,7 +1465,7 @@ def home():
             "type": "movie",
             "quality": {"$ne": "TRENDING"},
             "is_coming_soon": {"$ne": True}
-        }).sort('_id', -1).limit(12)
+        }).sort('_id', -1).limit(6) # .limit(6) added here
         latest_movies_list = list(latest_movies_result)
 
         # Latest Web Series (type == 'series', not trending, not coming soon)
@@ -1471,11 +1473,11 @@ def home():
             "type": "series",
             "quality": {"$ne": "TRENDING"},
             "is_coming_soon": {"$ne": True}
-        }).sort('_id', -1).limit(12)
+        }).sort('_id', -1).limit(6) # .limit(6) added here
         latest_series_list = list(latest_series_result)
 
         # Coming Soon (is_coming_soon == True)
-        coming_soon_result = movies.find({"is_coming_soon": True}).sort('_id', -1).limit(12)
+        coming_soon_result = movies.find({"is_coming_soon": True}).sort('_id', -1).limit(6) # .limit(6) added here
         coming_soon_movies_list = list(coming_soon_result)
 
     # Convert ObjectIds to strings for all fetched lists
