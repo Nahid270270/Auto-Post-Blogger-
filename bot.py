@@ -36,7 +36,6 @@ TMDb_Genre_Map = {
 }
 
 # --- START OF index_html TEMPLATE ---
-# (আপনার index_html কোড এখানে থাকবে, যা আগের মতো)
 index_html = """
 <!DOCTYPE html>
 <html lang="en">
@@ -159,6 +158,16 @@ index_html = """
     padding-bottom: 10px; /* Add padding for scrollbar */
   }
 
+  /* New style for vertical grid layout (for "See All" pages) */
+  .vertical-grid {
+    grid-auto-flow: row; /* Change to flow vertically */
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); /* 3-5 columns on desktop */
+    overflow-x: visible; /* Disable horizontal scrolling */
+    -webkit-overflow-scrolling: auto; /* Revert scrolling */
+    scroll-snap-type: none; /* Disable snapping */
+    padding-bottom: 0; /* No extra padding for scrollbar */
+  }
+
   /* Hide scrollbar for Chrome, Safari and Opera */
   .grid::-webkit-scrollbar {
     display: none;
@@ -168,19 +177,6 @@ index_html = """
     -ms-overflow-style: none;  /* IE and Edge */
     scrollbar-width: none;  /* Firefox */
   }
-
-  /* Specific styles for auto-scrolling grids */
-  /* .auto-scroll-grid {
-      animation: scrollGrid 30s linear infinite;
-  }
-  .auto-scroll-grid:hover {
-      animation-play-state: paused;
-  } */
-  /* Keyframe for auto-scrolling */
-  /* @keyframes scrollGrid {
-      0% { transform: translateX(0); }
-      100% { transform: translateX(calc(-100% + 100vw - 30px)); }
-  } */
 
   .movie-card {
     background: #181818; /* Dark card background */
@@ -342,6 +338,11 @@ index_html = """
         gap: 10px;
         margin-bottom: 30px;
     }
+    .vertical-grid { /* Mobile adjustment for vertical grid */
+        grid-auto-flow: row;
+        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); /* 2-3 columns on mobile */
+        gap: 15px;
+    }
     .movie-card { box-shadow: 0 0 5px rgba(0,0,0,0.5); }
     .movie-poster { height: 180px; } /* Larger height for mobile posters */
     .movie-info { padding: 8px; background: rgba(0, 0, 0, 0.7); }
@@ -367,16 +368,14 @@ index_html = """
     .movie-top-title {
         font-size: 13px;
     }
-
-    /* Mobile specific auto-scroll keyframe adjustment */
-    /* @keyframes scrollGrid {
-      0% { transform: translateX(0); }
-      100% { transform: translateX(calc(-100% + 100vw - 20px)); }
-    } */
   }
 
   @media (max-width: 480px) {
       .grid { grid-auto-columns: minmax(120px,1fr); } /* Even smaller min width for very small screens */
+      .vertical-grid {
+          grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); /* Adjust for smaller screens */
+          gap: 10px;
+      }
       .movie-poster { height: 160px; } /* Adjust height for very small screens */
   }
   /* Mobile adjustments - END */
@@ -420,14 +419,16 @@ index_html = """
   </form>
 </header>
 <main>
-  {% if query %}
+  {# Conditional rendering for full list pages vs. homepage sections #}
+  {% if is_full_page_list %}
     <div class="category-header">
-      <h2>Search Results for "{{ query }}"</h2>
+      <h2>{{ query }}</h2> {# query holds the title like "Trending on MovieZone" #}
+      {# No "See All" button for full list pages #}
     </div>
     {% if movies|length == 0 %}
-      <p style="text-align:center; color:#999; margin-top: 40px;">No movies found for your search.</p>
+      <p style="text-align:center; color:#999; margin-top: 40px;">No content found in this category.</p>
     {% else %}
-      <div class="grid"> {# Search results grid should not auto-scroll #}
+      <div class="grid vertical-grid"> {# Apply vertical-grid class here #}
         {% for m in movies %}
         <a href="{{ url_for('movie_detail', movie_id=m._id) }}" class="movie-card">
           {% if m.poster %}
@@ -460,165 +461,207 @@ index_html = """
         {% endfor %}
       </div>
     {% endif %}
-  {% else %}
-    <div class="category-header">
-      <h2>Trending on MovieZone</h2>
-      <a href="{{ url_for('trending_movies') }}" class="see-all-btn">See All</a>
-    </div>
-    {% if trending_movies|length == 0 %}
-      <p style="text-align:center; color:#999;">No trending movies found.</p>
-    {% else %}
-      <div class="grid"> {# Apply auto-scroll-grid class here #}
-        {% for m in trending_movies %}
-        <a href="{{ url_for('movie_detail', movie_id=m._id) }}" class="movie-card">
-          {% if m.poster %}
-            <img class="movie-poster" src="{{ m.poster }}" alt="{{ m.title }}">
-          {% else %}
-            <div style="height:270px; background:#333; display:flex;align-items:center;justify-content:center;color:#777;">
-              No Image
-            </div>
-          {% endif %}
-    
-          <div class="overlay-text">
-              {% if m.is_coming_soon %}
-                  <span class="label-badge coming-soon-badge">COMING SOON</span>
-              {% elif m.top_label %}
-                  <span class="label-badge custom-label">{{ m.top_label | upper }}</span>
-              {% elif m.original_language and m.original_language != 'N/A' %}
-                  <span class="label-badge">{{ m.original_language | upper }}</span>
-              {% endif %}
-              <span class="movie-top-title" title="{{ m.title }}">{{ m.title }}</span>
-          </div>
-    
-          {% if m.quality %}
-            <div class="badge {% if m.quality == 'TRENDING' %}trending{% endif %}">{{ m.quality }}</div>
-          {% endif %}
-          <div class="movie-info">
-            <h3 class="movie-title" title="{{ m.title }}">{{ m.title }}</h3>
-            <div class="movie-year">{{ m.year }}</div>
-          </div>
-        </a>
-        {% endfor %}
+  {% else %} {# Original home page sections #}
+    {% if query %}
+      <div class="category-header">
+        <h2>Search Results for "{{ query }}"</h2>
       </div>
-    {% endif %}
+      {% if movies|length == 0 %}
+        <p style="text-align:center; color:#999; margin-top: 40px;">No movies found for your search.</p>
+      {% else %}
+        <div class="grid vertical-grid"> {# Search results also vertical #}
+          {% for m in movies %}
+          <a href="{{ url_for('movie_detail', movie_id=m._id) }}" class="movie-card">
+            {% if m.poster %}
+              <img class="movie-poster" src="{{ m.poster }}" alt="{{ m.title }}">
+            {% else %}
+              <div style="height:270px; background:#333; display:flex;align-items:center;justify-content:center;color:#777;">
+                No Image
+              </div>
+            {% endif %}
+      
+            <div class="overlay-text">
+                {% if m.is_coming_soon %}
+                    <span class="label-badge coming-soon-badge">COMING SOON</span>
+                {% elif m.top_label %}
+                    <span class="label-badge custom-label">{{ m.top_label | upper }}</span>
+                {% elif m.original_language and m.original_language != 'N/A' %}
+                    <span class="label-badge">{{ m.original_language | upper }}</span>
+                {% endif %}
+                <span class="movie-top-title" title="{{ m.title }}">{{ m.title }}</span>
+            </div>
+      
+            {% if m.quality %}
+              <div class="badge {% if m.quality == 'TRENDING' %}trending{% endif %}">{{ m.quality }}</div>
+            {% endif %}
+            <div class="movie-info">
+              <h3 class="movie-title" title="{{ m.title }}">{{ m.title }}</h3>
+              <div class="movie-year">{{ m.year }}</div>
+            </div>
+          </a>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% else %}
+      <div class="category-header">
+        <h2>Trending on MovieZone</h2>
+        <a href="{{ url_for('trending_movies') }}" class="see-all-btn">See All</a>
+      </div>
+      {% if trending_movies|length == 0 %}
+        <p style="text-align:center; color:#999;">No trending movies found.</p>
+      {% else %}
+        <div class="grid"> {# Homepage trending grid remains horizontal #}
+          {% for m in trending_movies %}
+          <a href="{{ url_for('movie_detail', movie_id=m._id) }}" class="movie-card">
+            {% if m.poster %}
+              <img class="movie-poster" src="{{ m.poster }}" alt="{{ m.title }}">
+            {% else %}
+              <div style="height:270px; background:#333; display:flex;align-items:center;justify-content:center;color:#777;">
+                No Image
+              </div>
+            {% endif %}
+      
+            <div class="overlay-text">
+                {% if m.is_coming_soon %}
+                    <span class="label-badge coming-soon-badge">COMING SOON</span>
+                {% elif m.top_label %}
+                    <span class="label-badge custom-label">{{ m.top_label | upper }}</span>
+                {% elif m.original_language and m.original_language != 'N/A' %}
+                    <span class="label-badge">{{ m.original_language | upper }}</span>
+                {% endif %}
+                <span class="movie-top-title" title="{{ m.title }}">{{ m.title }}</span>
+            </div>
+      
+            {% if m.quality %}
+              <div class="badge {% if m.quality == 'TRENDING' %}trending{% endif %}">{{ m.quality }}</div>
+            {% endif %}
+            <div class="movie-info">
+              <h3 class="movie-title" title="{{ m.title }}">{{ m.title }}</h3>
+              <div class="movie-year">{{ m.year }}</div>
+            </div>
+          </a>
+          {% endfor %}
+        </div>
+      {% endif %}
 
-    <div class="category-header">
-      <h2>Latest Movies</h2>
-      <a href="{{ url_for('movies_only') }}" class="see-all-btn">See All</a>
-    </div>
-    {% if latest_movies|length == 0 %}
-      <p style="text-align:center; color:#999;">No movies found.</p>
-    {% else %}
-      <div class="grid"> {# Apply auto-scroll-grid class here #}
-        {% for m in latest_movies %}
-        <a href="{{ url_for('movie_detail', movie_id=m._id) }}" class="movie-card">
-          {% if m.poster %}
-            <img class="movie-poster" src="{{ m.poster }}" alt="{{ m.title }}">
-          {% else %}
-            <div style="height:270px; background:#333; display:flex;align-items:center;justify-content:center;color:#777;">
-              No Image
-            </div>
-          {% endif %}
-    
-          <div class="overlay-text">
-              {% if m.is_coming_soon %}
-                  <span class="label-badge coming-soon-badge">COMING SOON</span>
-              {% elif m.top_label %}
-                  <span class="label-badge custom-label">{{ m.top_label | upper }}</span>
-              {% elif m.original_language and m.original_language != 'N/A' %}
-                  <span class="label-badge">{{ m.original_language | upper }}</span>
-              {% endif %}
-              <span class="movie-top-title" title="{{ m.title }}">{{ m.title }}</span>
-          </div>
-    
-          {% if m.quality %}
-            <div class="badge {% if m.quality == 'TRENDING' %}trending{% endif %}">{{ m.quality }}</div>
-          {% endif %}
-          <div class="movie-info">
-            <h3 class="movie-title" title="{{ m.title }}">{{ m.title }}</h3>
-            <div class="movie-year">{{ m.year }}</div>
-          </div>
-        </a>
-        {% endfor %}
+      <div class="category-header">
+        <h2>Latest Movies</h2>
+        <a href="{{ url_for('movies_only') }}" class="see-all-btn">See All</a>
       </div>
-    {% endif %}
+      {% if latest_movies|length == 0 %}
+        <p style="text-align:center; color:#999;">No movies found.</p>
+      {% else %}
+        <div class="grid"> {# Homepage latest movies grid remains horizontal #}
+          {% for m in latest_movies %}
+          <a href="{{ url_for('movie_detail', movie_id=m._id) }}" class="movie-card">
+            {% if m.poster %}
+              <img class="movie-poster" src="{{ m.poster }}" alt="{{ m.title }}">
+            {% else %}
+              <div style="height:270px; background:#333; display:flex;align-items:center;justify-content:center;color:#777;">
+                No Image
+              </div>
+            {% endif %}
+      
+            <div class="overlay-text">
+                {% if m.is_coming_soon %}
+                    <span class="label-badge coming-soon-badge">COMING SOON</span>
+                {% elif m.top_label %}
+                    <span class="label-badge custom-label">{{ m.top_label | upper }}</span>
+                {% elif m.original_language and m.original_language != 'N/A' %}
+                    <span class="label-badge">{{ m.original_language | upper }}</span>
+                {% endif %}
+                <span class="movie-top-title" title="{{ m.title }}">{{ m.title }}</span>
+            </div>
+      
+            {% if m.quality %}
+              <div class="badge {% if m.quality == 'TRENDING' %}trending{% endif %}">{{ m.quality }}</div>
+            {% endif %}
+            <div class="movie-info">
+              <h3 class="movie-title" title="{{ m.title }}">{{ m.title }}</h3>
+              <div class="movie-year">{{ m.year }}</div>
+            </div>
+          </a>
+          {% endfor %}
+        </div>
+      {% endif %}
 
-    <div class="category-header">
-      <h2>Latest TV Series & Web Series</h2>
-      <a href="{{ url_for('webseries') }}" class="see-all-btn">See All</a>
-    </div>
-    {% if latest_series|length == 0 %}
-      <p style="text-align:center; color:#999;">No TV series or web series found.</p>
-    {% else %}
-      <div class="grid"> {# Apply auto-scroll-grid class here #}
-        {% for m in latest_series %}
-        <a href="{{ url_for('movie_detail', movie_id=m._id) }}" class="movie-card">
-          {% if m.poster %}
-            <img class="movie-poster" src="{{ m.poster }}" alt="{{ m.title }}">
-          {% else %}
-            <div style="height:270px; background:#333; display:flex;align-items:center;justify-content:center;color:#777;">
-              No Image
-            </div>
-          {% endif %}
-    
-          <div class="overlay-text">
-              {% if m.is_coming_soon %}
-                  <span class="label-badge coming-soon-badge">COMING SOON</span>
-              {% elif m.top_label %}
-                  <span class="label-badge custom-label">{{ m.top_label | upper }}</span>
-              {% elif m.original_language and m.original_language != 'N/A' %}
-                  <span class="label-badge">{{ m.original_language | upper }}</span>
-              {% endif %}
-              <span class="movie-top-title" title="{{ m.title }}">{{ m.title }}</span>
-          </div>
-    
-          {% if m.quality %}
-            <div class="badge {% if m.quality == 'TRENDING' %}trending{% endif %}">{{ m.quality }}</div>
-          {% endif %}
-          <div class="movie-info">
-            <h3 class="movie-title" title="{{ m.title }}">{{ m.title }}</h3>
-            <div class="movie-year">{{ m.year }}</div>
-          </div>
-        </a>
-        {% endfor %}
+      <div class="category-header">
+        <h2>Latest TV Series & Web Series</h2>
+        <a href="{{ url_for('webseries') }}" class="see-all-btn">See All</a>
       </div>
-    {% endif %}
+      {% if latest_series|length == 0 %}
+        <p style="text-align:center; color:#999;">No TV series or web series found.</p>
+      {% else %}
+        <div class="grid"> {# Homepage latest series grid remains horizontal #}
+          {% for m in latest_series %}
+          <a href="{{ url_for('movie_detail', movie_id=m._id) }}" class="movie-card">
+            {% if m.poster %}
+              <img class="movie-poster" src="{{ m.poster }}" alt="{{ m.title }}">
+            {% else %}
+              <div style="height:270px; background:#333; display:flex;align-items:center;justify-content:center;color:#777;">
+                No Image
+              </div>
+            {% endif %}
+      
+            <div class="overlay-text">
+                {% if m.is_coming_soon %}
+                    <span class="label-badge coming-soon-badge">COMING SOON</span>
+                {% elif m.top_label %}
+                    <span class="label-badge custom-label">{{ m.top_label | upper }}</span>
+                {% elif m.original_language and m.original_language != 'N/A' %}
+                    <span class="label-badge">{{ m.original_language | upper }}</span>
+                {% endif %}
+                <span class="movie-top-title" title="{{ m.title }}">{{ m.title }}</span>
+            </div>
+      
+            {% if m.quality %}
+              <div class="badge {% if m.quality == 'TRENDING' %}trending{% endif %}">{{ m.quality }}</div>
+            {% endif %}
+            <div class="movie-info">
+              <h3 class="movie-title" title="{{ m.title }}">{{ m.title }}</h3>
+              <div class="movie-year">{{ m.year }}</div>
+            </div>
+          </a>
+          {% endfor %}
+        </div>
+      {% endif %}
 
-    <div class="category-header">
-      <h2>Coming Soon</h2>
-      <a href="{{ url_for('coming_soon') }}" class="see-all-btn">See All</a>
-    </div>
-    {% if coming_soon_movies|length == 0 %}
-      <p style="text-align:center; color:#999;">No upcoming movies found.</p>
-    {% else %}
-      <div class="grid"> {# Apply auto-scroll-grid class here #}
-        {% for m in coming_soon_movies %}
-        <a href="{{ url_for('movie_detail', movie_id=m._id) }}" class="movie-card">
-          {% if m.poster %}
-            <img class="movie-poster" src="{{ m.poster }}" alt="{{ m.title }}">
-          {% else %}
-            <div style="height:270px; background:#333; display:flex;align-items:center;justify-content:center;color:#777;">
-              No Image
-            </div>
-          {% endif %}
-    
-          <div class="overlay-text">
-              <span class="label-badge coming-soon-badge">COMING SOON</span>
-              <span class="movie-top-title" title="{{ m.title }}">{{ m.title }}</span>
-          </div>
-    
-          {% if m.quality %}
-            <div class="badge {% if m.quality == 'TRENDING' %}trending{% endif %}">{{ m.quality }}</div>
-          {% endif %}
-          <div class="movie-info">
-            <h3 class="movie-title" title="{{ m.title }}">{{ m.title }}</h3>
-            <div class="movie-year">{{ m.year }}</div>
-          </div>
-        </a>
-        {% endfor %}
+      <div class="category-header">
+        <h2>Coming Soon</h2>
+        <a href="{{ url_for('coming_soon') }}" class="see-all-btn">See All</a>
       </div>
+      {% if coming_soon_movies|length == 0 %}
+        <p style="text-align:center; color:#999;">No upcoming movies found.</p>
+      {% else %}
+        <div class="grid"> {# Homepage coming soon grid remains horizontal #}
+          {% for m in coming_soon_movies %}
+          <a href="{{ url_for('movie_detail', movie_id=m._id) }}" class="movie-card">
+            {% if m.poster %}
+              <img class="movie-poster" src="{{ m.poster }}" alt="{{ m.title }}">
+            {% else %}
+              <div style="height:270px; background:#333; display:flex;align-items:center;justify-content:center;color:#777;">
+                No Image
+              </div>
+            {% endif %}
+      
+            <div class="overlay-text">
+                <span class="label-badge coming-soon-badge">COMING SOON</span>
+                <span class="movie-top-title" title="{{ m.title }}">{{ m.title }}</span>
+            </div>
+      
+            {% if m.quality %}
+              <div class="badge {% if m.quality == 'TRENDING' %}trending{% endif %}">{{ m.quality }}</div>
+            {% endif %}
+            <div class="movie-info">
+              <h3 class="movie-title" title="{{ m.title }}">{{ m.title }}</h3>
+              <div class="movie-year">{{ m.year }}</div>
+            </div>
+          </a>
+          {% endfor %}
+        </div>
+      {% endif %}
     {% endif %}
-  {% endif %}
+  {% endif %} {# End of is_full_page_list / else query block #}
 </main>
 <nav class="bottom-nav">
   <a href="{{ url_for('home') }}" class="nav-item {% if request.endpoint == 'home' and not request.args.get('q') %}active{% endif %}">
@@ -1450,14 +1493,18 @@ def home():
     latest_series_list = []
     coming_soon_movies_list = []
 
+    # is_full_page_list = False for the homepage
+    is_full_page_list = False
+
     if query:
         # Search functionality remains the same
         result = movies.find({"title": {"$regex": query, "$options": "i"}})
         movies_list = list(result)
+        is_full_page_list = True # Search results should also be vertical
     else:
         # Fetch data for each category on the homepage with a limit of 6
         # Trending (quality == 'TRENDING')
-        trending_movies_result = movies.find({"quality": "TRENDING"}).sort('_id', -1).limit(6) # .limit(6) added here
+        trending_movies_result = movies.find({"quality": "TRENDING"}).sort('_id', -1).limit(6)
         trending_movies_list = list(trending_movies_result)
 
         # Latest Movies (type == 'movie', not trending, not coming soon)
@@ -1465,7 +1512,7 @@ def home():
             "type": "movie",
             "quality": {"$ne": "TRENDING"},
             "is_coming_soon": {"$ne": True}
-        }).sort('_id', -1).limit(6) # .limit(6) added here
+        }).sort('_id', -1).limit(6)
         latest_movies_list = list(latest_movies_result)
 
         # Latest Web Series (type == 'series', not trending, not coming soon)
@@ -1473,11 +1520,11 @@ def home():
             "type": "series",
             "quality": {"$ne": "TRENDING"},
             "is_coming_soon": {"$ne": True}
-        }).sort('_id', -1).limit(6) # .limit(6) added here
+        }).sort('_id', -1).limit(6)
         latest_series_list = list(latest_series_result)
 
         # Coming Soon (is_coming_soon == True)
-        coming_soon_result = movies.find({"is_coming_soon": True}).sort('_id', -1).limit(6) # .limit(6) added here
+        coming_soon_result = movies.find({"is_coming_soon": True}).sort('_id', -1).limit(6)
         coming_soon_movies_list = list(coming_soon_result)
 
     # Convert ObjectIds to strings for all fetched lists
@@ -1486,12 +1533,13 @@ def home():
 
     return render_template_string(
         index_html, 
-        movies=movies_list, # Only used for search results
+        movies=movies_list, # Only used for search results or full page lists
         query=query,
         trending_movies=trending_movies_list,
         latest_movies=latest_movies_list,
         latest_series=latest_series_list,
-        coming_soon_movies=coming_soon_movies_list
+        coming_soon_movies=coming_soon_movies_list,
+        is_full_page_list=is_full_page_list # Pass this flag to the template
     )
 
 @app.route('/movie/<movie_id>')
@@ -1822,29 +1870,34 @@ def trending_movies():
     trending_list = list(movies.find({"quality": "TRENDING"}).sort('_id', -1))
     for m in trending_list:
         m['_id'] = str(m['_id'])
-    return render_template_string(index_html, movies=trending_list, query="Trending on MovieZone") # Use 'movies' for general display
+    # Pass is_full_page_list=True and use 'movies' for the list
+    return render_template_string(index_html, movies=trending_list, query="Trending on MovieZone", is_full_page_list=True)
 
 @app.route('/movies_only')
 def movies_only():
     movie_list = list(movies.find({"type": "movie", "quality": {"$ne": "TRENDING"}, "is_coming_soon": {"$ne": True}}).sort('_id', -1))
     for m in movie_list:
         m['_id'] = str(m['_id'])
-    return render_template_string(index_html, movies=movie_list, query="All Movies on MovieZone")
+    # Pass is_full_page_list=True and use 'movies' for the list
+    return render_template_string(index_html, movies=movie_list, query="All Movies on MovieZone", is_full_page_list=True)
 
 @app.route('/webseries')
 def webseries():
     series_list = list(movies.find({"type": "series", "quality": {"$ne": "TRENDING"}, "is_coming_soon": {"$ne": True}}).sort('_id', -1))
     for m in series_list:
         m['_id'] = str(m['_id'])
-    return render_template_string(index_html, movies=series_list, query="All Web Series on MovieZone")
+    # Pass is_full_page_list=True and use 'movies' for the list
+    return render_template_string(index_html, movies=series_list, query="All Web Series on MovieZone", is_full_page_list=True)
 
 @app.route('/coming_soon')
 def coming_soon():
     coming_soon_list = list(movies.find({"is_coming_soon": True}).sort('_id', -1))
     for m in coming_soon_list:
         m['_id'] = str(m['_id'])
-    return render_template_string(index_html, movies=coming_soon_list, query="Coming Soon to MovieZone")
+    # Pass is_full_page_list=True and use 'movies' for the list
+    return render_template_string(index_html, movies=coming_soon_list, query="Coming Soon to MovieZone", is_full_page_list=True)
 
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000, debug=True)
+
