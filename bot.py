@@ -1,5 +1,6 @@
-from flask import Flask, render_template_string, request, redirect
+from flask import Flask, render_template_string, request, redirect, url_for
 from pymongo import MongoClient
+from bson.objectid import ObjectId # Import ObjectId for querying by _id
 import requests, os
 
 app = Flask(__name__)
@@ -27,7 +28,7 @@ except Exception as e:
     print(f"Error connecting to MongoDB: {e}")
     exit(1)
 
-# --- Updated index_html for better mobile responsiveness ---
+# --- Updated index_html (Removed Watch button, made card clickable) ---
 index_html = """
 <!DOCTYPE html>
 <html lang="en">
@@ -43,7 +44,7 @@ index_html = """
   body {
     margin: 0; background: #121212; color: #eee;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    -webkit-tap-highlight-color: transparent; /* Remove tap highlight on mobile */
+    -webkit-tap-highlight-color: transparent;
   }
   a { text-decoration: none; color: inherit; }
   a:hover { color: #1db954; }
@@ -63,12 +64,11 @@ index_html = """
     margin: 0;
     font-weight: 700;
     font-size: 24px;
-    /* RGB Light Effect */
     background: linear-gradient(270deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #9400d3);
     background-size: 400% 400%;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    animation: gradientShift 10s ease infinite; /* Slower animation */
+    animation: gradientShift 10s ease infinite;
   }
 
   @keyframes gradientShift {
@@ -89,7 +89,7 @@ index_html = """
     border: none;
     font-size: 16px;
     outline: none;
-    background: #fff; /* Changed search box to white */
+    background: #fff;
     color: #333;
   }
   input[type="search"]::placeholder {
@@ -100,12 +100,11 @@ index_html = """
     max-width: 1200px;
     margin: 20px auto;
     padding: 0 15px;
-    padding-bottom: 70px; /* Space for fixed bottom nav */
+    padding-bottom: 70px;
   }
 
   .grid {
     display: grid;
-    /* Default for larger screens */
     grid-template-columns: repeat(auto-fill,minmax(180px,1fr));
     gap: 20px;
   }
@@ -124,8 +123,8 @@ index_html = """
   }
   .movie-poster {
     width: 100%;
-    height: 270px; /* Default height for larger screens */
-    object-fit: cover; /* Cover the area without stretching */
+    height: 270px;
+    object-fit: cover;
     display: block;
   }
   .movie-info {
@@ -148,7 +147,7 @@ index_html = """
     position: absolute;
     top: 8px;
     left: 8px;
-    background: #1db954; /* Default for quality */
+    background: #1db954;
     color: #000;
     font-weight: 700;
     font-size: 12px;
@@ -157,146 +156,56 @@ index_html = """
     text-transform: uppercase;
     user-select: none;
   }
-  /* Specific style for "Trending" badge */
   .badge.trending {
-    background: linear-gradient(45deg, #ff0077, #ff9900); /* Red-Orange gradient for trending */
+    background: linear-gradient(45deg, #ff0077, #ff9900);
     color: #fff;
   }
 
+  /* Overview hidden by default in card view */
   .overview {
-    font-size: 13px;
-    color: #ccc;
-    max-height: 0;
-    opacity: 0;
-    padding: 0 10px;
-    overflow: hidden;
-    transition: max-height 0.3s ease, opacity 0.3s ease;
-  }
-  .movie-card:hover .overview {
-    max-height: 80px;
-    opacity: 1;
-    margin-bottom: 10px;
-  }
-  .watch-btn {
-    display: block;
-    background: #1db954;
-    color: #000;
-    font-weight: 700;
-    padding: 8px 0;
-    border-radius: 0 0 8px 8px;
-    text-align: center;
-    font-size: 16px;
-    user-select: none;
-  }
-  .watch-btn:hover {
-    background: #17a34a;
+    display: none;
   }
 
-  /* Added for "Trending on MovieDokan" style */
   .trending-header {
       color: #fff;
       font-size: 22px;
       font-weight: 700;
       padding: 10px 15px;
-      background: linear-gradient(90deg, #e44d26, #f16529); /* Orange gradient */
+      background: linear-gradient(90deg, #e44d26, #f16529);
       border-radius: 5px;
       margin-bottom: 25px;
       text-align: center;
       box-shadow: 0 2px 10px rgba(0,0,0,0.5);
   }
   .trending-header::before {
-      content: '🔥'; /* Fire emoji */
+      content: '🔥';
       margin-right: 10px;
   }
 
-
   /* Mobile adjustments - START */
-  @media (max-width: 768px) { /* Adjust breakpoint as needed */
-    header {
-      padding: 8px 15px;
-    }
-    header h1 {
-        font-size: 20px;
-    }
-    form {
-        margin-left: 10px;
-    }
-    input[type="search"] {
-        max-width: unset;
-        font-size: 14px;
-        padding: 6px 10px;
-    }
-    main {
-        margin: 15px auto;
-        padding: 0 10px;
-        padding-bottom: 60px; /* Smaller space for smaller bottom nav */
-    }
-    .trending-header {
-        font-size: 18px;
-        padding: 8px 10px;
-        margin-bottom: 20px;
-    }
-    .grid {
-        /* Mobile-specific grid: e.g., 3 columns, smaller min width */
-        grid-template-columns: repeat(auto-fill,minmax(100px,1fr)); /* Smaller cards */
-        gap: 10px; /* Smaller gap */
-    }
-    .movie-card {
-        box-shadow: 0 0 5px rgba(0,0,0,0.5);
-    }
-    .movie-poster {
-        height: 150px; /* Significantly smaller height for mobile */
-    }
-    .movie-info {
-        padding: 8px;
-    }
-    .movie-title {
-        font-size: 13px; /* Smaller title font */
-        margin: 0 0 2px 0;
-    }
-    .movie-year {
-        font-size: 11px; /* Smaller year font */
-        margin-bottom: 4px;
-    }
-    .badge {
-        font-size: 10px;
-        padding: 1px 4px;
-        top: 5px;
-        left: 5px;
-    }
-    .overview {
-        display: none; /* Hide overview on mobile to save space */
-    }
-    .movie-card:hover .overview {
-        max-height: 0; /* Override hover effect */
-        opacity: 0;
-        margin-bottom: 0;
-    }
-    .watch-btn {
-        font-size: 12px; /* Smaller button font */
-        padding: 6px 0;
-    }
+  @media (max-width: 768px) {
+    header { padding: 8px 15px; }
+    header h1 { font-size: 20px; }
+    form { margin-left: 10px; }
+    input[type="search"] { max-width: unset; font-size: 14px; padding: 6px 10px; }
+    main { margin: 15px auto; padding: 0 10px; padding-bottom: 60px; }
+    .trending-header { font-size: 18px; padding: 8px 10px; margin-bottom: 20px; }
+    .grid { grid-template-columns: repeat(auto-fill,minmax(100px,1fr)); gap: 10px; }
+    .movie-card { box-shadow: 0 0 5px rgba(0,0,0,0.5); }
+    .movie-poster { height: 150px; }
+    .movie-info { padding: 8px; }
+    .movie-title { font-size: 13px; margin: 0 0 2px 0; }
+    .movie-year { font-size: 11px; margin-bottom: 4px; }
+    .badge { font-size: 10px; padding: 1px 4px; top: 5px; left: 5px; }
+    .watch-btn { display: none; } /* Watch button now only on detail page */
   }
 
-  @media (max-width: 480px) { /* Even smaller screens */
-      .grid {
-          grid-template-columns: repeat(auto-fill,minmax(90px,1fr)); /* Even smaller min width */
-      }
-      .movie-poster {
-          height: 130px; /* Even smaller height */
-      }
-      .movie-title {
-          font-size: 12px;
-      }
-      .movie-year {
-          font-size: 10px;
-      }
-      .watch-btn {
-          font-size: 11px;
-          padding: 5px 0;
-      }
+  @media (max-width: 480px) {
+      .grid { grid-template-columns: repeat(auto-fill,minmax(90px,1fr)); }
+      .movie-poster { height: 130px; }
+      .movie-title { font-size: 12px; }
+      .movie-year { font-size: 10px; }
   }
-
   /* Mobile adjustments - END */
 
   /* Optional: Bottom Navigation Bar styles (as seen in screenshot) */
@@ -324,23 +233,14 @@ index_html = """
   .nav-item:hover {
     color: #1db954;
   }
-  /* Using Font Awesome for icons (requires linking CDN in <head>) */
   .nav-item i {
       font-size: 24px;
       margin-bottom: 4px;
   }
-  /* Smaller icons for mobile */
   @media (max-width: 768px) {
-      .bottom-nav {
-          padding: 8px 0;
-      }
-      .nav-item {
-          font-size: 10px;
-      }
-      .nav-item i {
-          font-size: 20px;
-          margin-bottom: 2px;
-      }
+      .bottom-nav { padding: 8px 0; }
+      .nav-item { font-size: 10px; }
+      .nav-item i { font-size: 20px; margin-bottom: 2px; }
   }
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
@@ -359,7 +259,7 @@ index_html = """
   {% else %}
   <div class="grid">
     {% for m in movies %}
-    <div class="movie-card">
+    <a href="{{ url_for('movie_detail', movie_id=m._id) }}" class="movie-card"> {# Card is now a link #}
       {% if m.poster %}
         <img class="movie-poster" src="{{ m.poster }}" alt="{{ m.title }}">
       {% else %}
@@ -373,19 +273,15 @@ index_html = """
       <div class="movie-info">
         <h3 class="movie-title" title="{{ m.title }}">{{ m.title }}</h3>
         <div class="movie-year">{{ m.year }}</div>
-        <p class="overview">{{ m.overview }}</p>
       </div>
-      {% if m.link %}
-        <a class="watch-btn" href="{{ m.link }}" target="_blank" rel="noopener">▶ Watch</a>
-      {% endif %}
-    </div>
+      {# Watch button moved to detail page #}
+    </a>
     {% endfor %}
   </div>
   {% endif %}
 </main>
-
 <nav class="bottom-nav">
-  <a href="#" class="nav-item">
+  <a href="{{ url_for('home') }}" class="nav-item">
     <i class="fas fa-home"></i>
     <span>Home</span>
   </a>
@@ -393,7 +289,7 @@ index_html = """
     <i class="fas fa-film"></i>
     <span>Movie</span>
   </a>
-  <a href="#" class="nav-item">
+  <a href="{{ url_for('admin') }}" class="nav-item"> {# Link to admin for quick access #}
     <i class="fas fa-plus-circle"></i>
     <span>Request</span>
   </a>
@@ -406,7 +302,242 @@ index_html = """
     <span>Search</span>
   </a>
 </nav>
+</body>
+</html>
+"""
 
+# --- New detail_html template ---
+detail_html = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>{{ movie.title }} - Movie Details</title>
+<style>
+  /* General styles (similar to index_html for consistency) */
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #121212; color: #eee; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+  a { text-decoration: none; color: inherit; }
+  a:hover { color: #1db954; }
+
+  header {
+    position: sticky; top: 0; left: 0; right: 0;
+    background: #181818; padding: 10px 20px;
+    display: flex; justify-content: space-between; align-items: center; z-index: 100;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.7);
+  }
+  header h1 {
+    margin: 0; font-weight: 700; font-size: 24px;
+    background: linear-gradient(270deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #9400d3);
+    background-size: 400% 400%; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    animation: gradientShift 10s ease infinite;
+  }
+  @keyframes gradientShift {
+    0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; }
+  }
+  .back-button {
+      color: #1db954;
+      font-size: 18px;
+      margin-right: 20px;
+  }
+  .back-button i { margin-right: 5px; }
+
+  /* Detail Page Specific Styles */
+  .movie-detail-container {
+    max-width: 900px;
+    margin: 20px auto;
+    padding: 20px;
+    background: #181818;
+    border-radius: 8px;
+    box-shadow: 0 0 15px rgba(0,0,0,0.7);
+    display: flex;
+    flex-direction: column; /* Stack vertically on small screens */
+    gap: 20px;
+  }
+  .detail-poster {
+    width: 100%;
+    max-width: 300px; /* Limit poster width */
+    height: auto;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);
+    align-self: center; /* Center poster when stacked */
+  }
+  .detail-info {
+    flex-grow: 1;
+  }
+  .detail-title {
+    font-size: 32px;
+    font-weight: 700;
+    margin: 0 0 10px 0;
+    color: #1db954;
+  }
+  .detail-year {
+    font-size: 18px;
+    color: #aaa;
+    margin-bottom: 15px;
+  }
+  .detail-overview {
+    font-size: 16px;
+    line-height: 1.6;
+    color: #ccc;
+    margin-bottom: 25px;
+  }
+  .detail-quality {
+      display: inline-block;
+      background: #1db954;
+      color: #000;
+      font-weight: 700;
+      padding: 5px 10px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+      text-transform: uppercase;
+  }
+  .detail-quality.trending {
+    background: linear-gradient(45deg, #ff0077, #ff9900);
+    color: #fff;
+  }
+
+  .action-buttons {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap; /* Allow buttons to wrap on smaller screens */
+  }
+  .action-button {
+    flex: 1; /* Allow buttons to grow and shrink */
+    min-width: 150px; /* Minimum width for buttons */
+    padding: 12px 20px;
+    border-radius: 8px;
+    text-align: center;
+    font-size: 18px;
+    font-weight: 700;
+    transition: background 0.3s ease;
+  }
+  .watch-button {
+    background: #1db954;
+    color: #000;
+  }
+  .watch-button:hover {
+    background: #17a34a;
+  }
+  .download-button {
+    background: #007bff; /* Blue for download */
+    color: #fff;
+  }
+  .download-button:hover {
+    background: #0056b3;
+  }
+  /* Fallback for no link */
+  .no-link-message {
+      color: #999;
+      font-size: 14px;
+      margin-top: 10px;
+  }
+
+  /* Mobile adjustments */
+  @media (min-width: 769px) { /* On larger screens, display side-by-side */
+      .movie-detail-container {
+          flex-direction: row;
+      }
+      .detail-poster {
+          margin-right: 30px; /* Space between poster and info */
+          align-self: flex-start; /* Align poster to top */
+      }
+  }
+
+  @media (max-width: 768px) {
+    header { padding: 8px 15px; }
+    header h1 { font-size: 20px; }
+    .back-button { font-size: 16px; }
+    .movie-detail-container { padding: 15px; margin: 15px auto; }
+    .detail-poster { max-width: 200px; } /* Smaller poster on mobile */
+    .detail-title { font-size: 24px; }
+    .detail-year { font-size: 16px; }
+    .detail-overview { font-size: 14px; }
+    .detail-quality { font-size: 12px; padding: 3px 8px; }
+    .action-button { font-size: 16px; padding: 10px 15px; }
+  }
+
+  /* Bottom nav for consistency (same as index_html) */
+  .bottom-nav {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: #181818; display: flex; justify-content: space-around;
+    padding: 10px 0; box-shadow: 0 -2px 5px rgba(0,0,0,0.7); z-index: 200;
+  }
+  .nav-item {
+    display: flex; flex-direction: column; align-items: center;
+    color: #ccc; font-size: 12px; text-align: center; transition: color 0.2s ease;
+  }
+  .nav-item:hover { color: #1db954; }
+  .nav-item i { font-size: 24px; margin-bottom: 4px; }
+  @media (max-width: 768px) {
+      .bottom-nav { padding: 8px 0; }
+      .nav-item { font-size: 10px; }
+      .nav-item i { font-size: 20px; margin-bottom: 2px; }
+  }
+</style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+<header>
+  <a href="{{ url_for('home') }}" class="back-button"><i class="fas fa-arrow-left"></i>Back</a>
+  <h1>Movie Dokan</h1>
+</header>
+<main>
+  {% if movie %}
+  <div class="movie-detail-container">
+    {% if movie.poster %}
+      <img class="detail-poster" src="{{ movie.poster }}" alt="{{ movie.title }}">
+    {% else %}
+      <div class="detail-poster" style="background:#333; display:flex;align-items:center;justify-content:center;color:#777; font-size:18px;">
+        No Image
+      </div>
+    {% endif %}
+    <div class="detail-info">
+      <h2 class="detail-title">{{ movie.title }}</h2>
+      <div class="detail-year">{{ movie.year }}</div>
+      {% if movie.quality %}
+        <div class="detail-quality {% if movie.quality == 'TRENDING' %}trending{% endif %}">{{ movie.quality }}</div>
+      {% endif %}
+      <p class="detail-overview">{{ movie.overview }}</p>
+      
+      <div class="action-buttons">
+        {% if movie.link %}
+          <a class="action-button watch-button" href="{{ movie.link }}" target="_blank" rel="noopener">▶ Watch Now</a>
+          {# You can add a separate download link if your 'link' sometimes means download #}
+          {# <a class="action-button download-button" href="{{ movie.link }}" target="_blank" rel="noopener">⇩ Download</a> #}
+        {% else %}
+          <p class="no-link-message">No watch/download link available yet.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% else %}
+    <p style="text-align:center; color:#999; margin-top: 40px;">Movie not found.</p>
+  {% endif %}
+</main>
+<nav class="bottom-nav">
+  <a href="{{ url_for('home') }}" class="nav-item">
+    <i class="fas fa-home"></i>
+    <span>Home</span>
+  </a>
+  <a href="#" class="nav-item">
+    <i class="fas fa-film"></i>
+    <span>Movie</span>
+  </a>
+  <a href="{{ url_for('admin') }}" class="nav-item">
+    <i class="fas fa-plus-circle"></i>
+    <span>Request</span>
+  </a>
+  <a href="#" class="nav-item">
+    <i class="fas fa-tv"></i>
+    <span>Web Series</span>
+  </a>
+  <a href="#" class="nav-item">
+    <i class="fas fa-search"></i>
+    <span>Search</span>
+  </a>
+</nav>
 </body>
 </html>
 """
@@ -480,7 +611,24 @@ def home():
         result = movies.find().sort('_id', -1).limit(30)
     
     movies_list = list(result)
+    # Ensure _id is converted to string for URL generation
+    for movie in movies_list:
+        movie['_id'] = str(movie['_id']) 
     return render_template_string(index_html, movies=movies_list, query=query)
+
+# --- New Route for Movie Details ---
+@app.route('/movie/<movie_id>')
+def movie_detail(movie_id):
+    try:
+        # Fetch movie from MongoDB using its _id
+        movie = movies.find_one({"_id": ObjectId(movie_id)})
+        if movie:
+            # Convert _id to string for template
+            movie['_id'] = str(movie['_id'])
+        return render_template_string(detail_html, movie=movie)
+    except Exception as e:
+        print(f"Error fetching movie detail for ID {movie_id}: {e}")
+        return render_template_string(detail_html, movie=None) # Or render an error page
 
 @app.route('/admin', methods=["GET", "POST"])
 def admin():
@@ -520,7 +668,7 @@ def admin():
         try:
             movies.insert_one(movie_data)
             print(f"Movie '{movie_data['title']}' added successfully!")
-            return redirect('/admin')
+            return redirect(url_for('admin')) # Use url_for for robustness
         except Exception as e:
             print(f"Error inserting movie into MongoDB: {e}")
             return render_template_string(admin_html, error="Failed to add movie.")
