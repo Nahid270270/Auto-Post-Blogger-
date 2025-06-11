@@ -127,7 +127,7 @@ index_html = """
     overflow: hidden;
     box-shadow: 0 0 8px rgba(0,0,0,0.6);
     transition: transform 0.2s ease;
-    position: relative;
+    position: relative; /* Crucial for positioning child elements */
     cursor: pointer;
     border: 2px solid transparent; /* Initial transparent border for smooth transition */
   }
@@ -152,7 +152,7 @@ index_html = """
 
   .movie-poster {
     width: 100%;
-    height: 270px; /* Standard poster height */
+    height: 270px; /* Standard poster height - as per your request to make it larger */
     object-fit: cover;
     display: block;
   }
@@ -214,6 +214,44 @@ index_html = """
       content: ''; /* No extra content needed for this style */
   }
 
+  /* New styles for overlay text on poster */
+  .overlay-text {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start; /* Align text to the left */
+      z-index: 5; /* Below the trending badge */
+      text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+      color: #fff;
+  }
+  .label-badge { /* Reusing for both language and custom top_label */
+      background: rgba(0, 0, 0, 0.6); /* Semi-transparent black background */
+      color: #fff;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-bottom: 5px; /* Space between label and title */
+      text-transform: uppercase;
+  }
+  .label-badge.custom-label { /* Specific style for custom top_label */
+      background-color: #ff9800; /* Orange background for custom labels */
+  }
+  .movie-top-title {
+      font-size: 14px;
+      font-weight: bold;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      width: 100%; /* Take full width of overlay-text */
+      padding-right: 5px; /* Ensure space from right edge */
+  }
+
   .overview { display: none; } /* Overview hidden by default in card view */
 
   /* Trending Header */
@@ -254,6 +292,17 @@ index_html = """
         font-size: 9px; padding: 1px 4px; top: 5px; right: -15px; /* Adjust for smaller screens */
         transform: rotate(45deg); /* Keep rotation */
         width: 80px; /* Smaller width for mobile badge */
+    }
+    .overlay-text {
+        padding: 5px; /* Smaller padding on mobile */
+    }
+    .label-badge {
+        font-size: 10px;
+        padding: 2px 5px;
+        margin-bottom: 3px;
+    }
+    .movie-top-title {
+        font-size: 12px;
     }
   }
 
@@ -316,6 +365,16 @@ index_html = """
           No Image
         </div>
       {% endif %}
+
+      <div class="overlay-text">
+          {% if m.top_label %}
+              <span class="label-badge custom-label">{{ m.top_label | upper }}</span>
+          {% elif m.original_language and m.original_language != 'N/A' %}
+              <span class="label-badge">{{ m.original_language | upper }}</span>
+          {% endif %}
+          <span class="movie-top-title" title="{{ m.title }}">{{ m.title }}</span>
+      </div>
+
       {% if m.quality %}
         <div class="badge {% if m.quality == 'TRENDING' %}trending{% endif %}">{{ m.quality }}</div>
       {% endif %}
@@ -839,6 +898,11 @@ admin_html = """
     </div>
 
     <div class="form-group">
+        <label for="top_label">Poster Top Label (Optional, e.g., Special Offer, New):</label>
+        <input type="text" name="top_label" id="top_label" placeholder="Custom label on poster top" />
+    </div>
+
+    <div class="form-group">
         <label for="overview">Overview (Optional - used if TMDb info not found):</label>
         <textarea name="overview" id="overview" rows="5" placeholder="Enter movie overview or synopsis"></textarea>
     </div>
@@ -962,27 +1026,27 @@ def movie_detail(movie_id):
                     try:
                         res = requests.get(tmdb_detail_url, timeout=5).json()
                         if res:
-                            # Only update if TMDb provides a better value
-                            if res.get("overview"):
+                            # Only update if TMDb provides a better value AND manual data wasn't provided
+                            if movie.get("overview") == "No overview available." and res.get("overview"):
                                 movie["overview"] = res.get("overview")
-                            if res.get("poster_path"):
+                            if not movie.get("poster") and res.get("poster_path"):
                                 movie["poster"] = f"https://image.tmdb.org/t/p/w500{res['poster_path']}"
                             
                             release_date = res.get("release_date", "")
-                            if release_date:
+                            if movie.get("year") == "N/A" and release_date:
                                 movie["year"] = release_date[:4]
                                 movie["release_date"] = release_date
                             
-                            if res.get("vote_average"):
+                            if movie.get("vote_average") is None and res.get("vote_average"):
                                 movie["vote_average"] = res.get("vote_average")
-                            if res.get("original_language"):
+                            if movie.get("original_language") == "N/A" and res.get("original_language"):
                                 movie["original_language"] = res.get("original_language")
                             
                             genres_names = []
                             for genre_obj in res.get("genres", []):
                                 if isinstance(genre_obj, dict) and genre_obj.get("id") in TMDb_Genre_Map:
                                     genres_names.append(TMDb_Genre_Map[genre_obj["id"]])
-                            if genres_names: # Only update if TMDb provides genres
+                            if (not movie.get("genres") or movie["genres"] == []) and genres_names: # Only update if TMDb provides genres and no manual genres
                                 movie["genres"] = genres_names
 
                             # Persist TMDb fetched data to DB
@@ -1036,7 +1100,8 @@ def admin():
         manual_year = request.form.get("year")
         manual_original_language = request.form.get("original_language")
         manual_genres_str = request.form.get("genres")
-        
+        manual_top_label = request.form.get("top_label") # New: Get custom top label
+
         # Process manual genres (comma-separated string to list)
         manual_genres_list = [g.strip() for g in manual_genres_str.split(',') if g.strip()] if manual_genres_str else []
 
@@ -1057,34 +1122,38 @@ def admin():
             "vote_average": None,
             "original_language": manual_original_language if manual_original_language else "N/A",
             "genres": manual_genres_list,
-            "tmdb_id": None
+            "tmdb_id": None,
+            "top_label": manual_top_label if manual_top_label else "" # New: Store custom top label
         }
 
         # Try to fetch from TMDb only if no manual poster or overview was provided
-        if TMDB_API_KEY and not manual_poster_url and not manual_overview:
+        # Or if the existing data is still default (e.g., "No overview available.")
+        if TMDB_API_KEY and (not manual_poster_url and not manual_overview or movie_data["overview"] == "No overview available." or not movie_data["poster"]):
             tmdb_url = f"https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={title}"
             try:
                 res = requests.get(tmdb_url, timeout=5).json()
                 if res and "results" in res and res["results"]:
                     data = res["results"][0]
-                    # Overwrite only if TMDb provides a value
-                    movie_data["title"] = data.get("title", movie_data["title"]) # Keep manual title if TMDb title is bad
-                    movie_data["overview"] = data.get("overview", movie_data["overview"])
-                    movie_data["poster"] = f"https://image.tmdb.org/t/p/w500{data['poster_path']}" if data.get("poster_path") else movie_data["poster"]
+                    # Overwrite only if TMDb provides a value and manual data wasn't explicitly provided
+                    if not manual_overview and data.get("overview"):
+                        movie_data["overview"] = data.get("overview")
+                    if not manual_poster_url and data.get("poster_path"):
+                        movie_data["poster"] = f"https://image.tmdb.org/t/p/w500{data['poster_path']}"
                     
                     release_date = data.get("release_date", "")
-                    if release_date:
+                    if not manual_year and release_date:
                         movie_data["year"] = release_date[:4]
                         movie_data["release_date"] = release_date
                     
                     movie_data["vote_average"] = data.get("vote_average", movie_data["vote_average"])
-                    movie_data["original_language"] = data.get("original_language", movie_data["original_language"])
+                    if not manual_original_language and data.get("original_language"):
+                        movie_data["original_language"] = data.get("original_language")
                     
                     genres_names = []
                     for genre_id in data.get("genre_ids", []):
                         if genre_id in TMDb_Genre_Map:
                             genres_names.append(TMDb_Genre_Map[genre_id])
-                    if genres_names: # Only update genres if TMDb provides them
+                    if not manual_genres_list and genres_names: # Only update genres if TMDb provides them AND no manual genres
                         movie_data["genres"] = genres_names
                     
                     movie_data["tmdb_id"] = data.get("id")
@@ -1095,7 +1164,7 @@ def admin():
             except Exception as e:
                 print(f"An unexpected error occurred while fetching TMDb data: {e}")
         else:
-            print("Skipping TMDb API call (no key, or manual poster/overview provided).")
+            print("Skipping TMDb API call (no key, or manual poster/overview provided, or data already present).")
 
         try:
             movies.insert_one(movie_data)
