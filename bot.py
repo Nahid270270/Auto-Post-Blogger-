@@ -27,7 +27,7 @@ except Exception as e:
     print(f"Error connecting to MongoDB: {e}")
     exit(1)
 
-# --- Updated index_html with RGB Title Effect ---
+# --- Updated index_html for better mobile responsiveness ---
 index_html = """
 <!DOCTYPE html>
 <html lang="en">
@@ -43,6 +43,7 @@ index_html = """
   body {
     margin: 0; background: #121212; color: #eee;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    -webkit-tap-highlight-color: transparent; /* Remove tap highlight on mobile */
   }
   a { text-decoration: none; color: inherit; }
   a:hover { color: #1db954; }
@@ -99,10 +100,12 @@ index_html = """
     max-width: 1200px;
     margin: 20px auto;
     padding: 0 15px;
+    padding-bottom: 70px; /* Space for fixed bottom nav */
   }
 
   .grid {
     display: grid;
+    /* Default for larger screens */
     grid-template-columns: repeat(auto-fill,minmax(180px,1fr));
     gap: 20px;
   }
@@ -113,6 +116,7 @@ index_html = """
     box-shadow: 0 0 8px rgba(0,0,0,0.6);
     transition: transform 0.2s ease;
     position: relative;
+    cursor: pointer; /* Indicate clickable */
   }
   .movie-card:hover {
     transform: scale(1.05);
@@ -120,9 +124,9 @@ index_html = """
   }
   .movie-poster {
     width: 100%;
-    display: block;
-    height: 270px; /* Ensure consistent height for all posters */
+    height: 270px; /* Default height for larger screens */
     object-fit: cover; /* Cover the area without stretching */
+    display: block;
   }
   .movie-info {
     padding: 10px;
@@ -206,26 +210,94 @@ index_html = """
   }
 
 
-  /* Mobile adjustments */
-  @media (max-width: 600px) {
-    .movie-title {
-      font-size: 16px;
-    }
-    .watch-btn {
-      font-size: 14px;
-      padding: 6px 0;
+  /* Mobile adjustments - START */
+  @media (max-width: 768px) { /* Adjust breakpoint as needed */
+    header {
+      padding: 8px 15px;
     }
     header h1 {
         font-size: 20px;
     }
+    form {
+        margin-left: 10px;
+    }
     input[type="search"] {
         max-width: unset;
         font-size: 14px;
+        padding: 6px 10px;
+    }
+    main {
+        margin: 15px auto;
+        padding: 0 10px;
+        padding-bottom: 60px; /* Smaller space for smaller bottom nav */
     }
     .trending-header {
         font-size: 18px;
+        padding: 8px 10px;
+        margin-bottom: 20px;
+    }
+    .grid {
+        /* Mobile-specific grid: e.g., 3 columns, smaller min width */
+        grid-template-columns: repeat(auto-fill,minmax(100px,1fr)); /* Smaller cards */
+        gap: 10px; /* Smaller gap */
+    }
+    .movie-card {
+        box-shadow: 0 0 5px rgba(0,0,0,0.5);
+    }
+    .movie-poster {
+        height: 150px; /* Significantly smaller height for mobile */
+    }
+    .movie-info {
+        padding: 8px;
+    }
+    .movie-title {
+        font-size: 13px; /* Smaller title font */
+        margin: 0 0 2px 0;
+    }
+    .movie-year {
+        font-size: 11px; /* Smaller year font */
+        margin-bottom: 4px;
+    }
+    .badge {
+        font-size: 10px;
+        padding: 1px 4px;
+        top: 5px;
+        left: 5px;
+    }
+    .overview {
+        display: none; /* Hide overview on mobile to save space */
+    }
+    .movie-card:hover .overview {
+        max-height: 0; /* Override hover effect */
+        opacity: 0;
+        margin-bottom: 0;
+    }
+    .watch-btn {
+        font-size: 12px; /* Smaller button font */
+        padding: 6px 0;
     }
   }
+
+  @media (max-width: 480px) { /* Even smaller screens */
+      .grid {
+          grid-template-columns: repeat(auto-fill,minmax(90px,1fr)); /* Even smaller min width */
+      }
+      .movie-poster {
+          height: 130px; /* Even smaller height */
+      }
+      .movie-title {
+          font-size: 12px;
+      }
+      .movie-year {
+          font-size: 10px;
+      }
+      .watch-btn {
+          font-size: 11px;
+          padding: 5px 0;
+      }
+  }
+
+  /* Mobile adjustments - END */
 
   /* Optional: Bottom Navigation Bar styles (as seen in screenshot) */
   .bottom-nav {
@@ -252,19 +324,23 @@ index_html = """
   .nav-item:hover {
     color: #1db954;
   }
-  .nav-item img { /* If using image icons */
-      width: 24px;
-      height: 24px;
-      margin-bottom: 4px;
-      filter: invert(0.8); /* Adjust for light icons on dark background */
-  }
-  .nav-item:hover img {
-      filter: invert(1) drop-shadow(0 0 5px #1db954); /* Highlight icon on hover */
-  }
   /* Using Font Awesome for icons (requires linking CDN in <head>) */
   .nav-item i {
       font-size: 24px;
       margin-bottom: 4px;
+  }
+  /* Smaller icons for mobile */
+  @media (max-width: 768px) {
+      .bottom-nav {
+          padding: 8px 0;
+      }
+      .nav-item {
+          font-size: 10px;
+      }
+      .nav-item i {
+          font-size: 20px;
+          margin-bottom: 2px;
+      }
   }
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
@@ -335,7 +411,7 @@ index_html = """
 </html>
 """
 
-# --- Updated admin_html with RGB Title Effect ---
+# --- admin_html remains unchanged from previous version ---
 admin_html = """
 <!DOCTYPE html>
 <html>
@@ -399,13 +475,10 @@ admin_html = """
 def home():
     query = request.args.get('q')
     if query:
-        # Using regex for case-insensitive search
         result = movies.find({"title": {"$regex": query, "$options": "i"}})
     else:
-        # Fetching latest 30 movies, you might want a more complex sorting
         result = movies.find().sort('_id', -1).limit(30)
     
-    # Convert cursor to list for render_template_string
     movies_list = list(result)
     return render_template_string(index_html, movies=movies_list, query=query)
 
@@ -414,7 +487,7 @@ def admin():
     if request.method == "POST":
         title = request.form.get("title")
         link = request.form.get("link")
-        quality = request.form.get("quality", "").upper() # Ensure quality is uppercase
+        quality = request.form.get("quality", "").upper()
         
         movie_data = {
             "title": title,
@@ -428,10 +501,10 @@ def admin():
         if TMDB_API_KEY:
             tmdb_url = f"https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={title}"
             try:
-                res = requests.get(tmdb_url, timeout=5).json() # Added timeout
+                res = requests.get(tmdb_url, timeout=5).json()
                 if res and "results" in res and res["results"]:
                     data = res["results"][0]
-                    movie_data["title"] = data.get("title", title) # Use TMDb title if available
+                    movie_data["title"] = data.get("title", title)
                     movie_data["overview"] = data.get("overview", "No overview available.")
                     movie_data["poster"] = f"https://image.tmdb.org/t/p/w500{data['poster_path']}" if data.get("poster_path") else ""
                     movie_data["year"] = data.get("release_date", "")[:4]
@@ -450,10 +523,9 @@ def admin():
             return redirect('/admin')
         except Exception as e:
             print(f"Error inserting movie into MongoDB: {e}")
-            # Optionally, render admin_html with an error message
             return render_template_string(admin_html, error="Failed to add movie.")
 
     return render_template_string(admin_html)
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5000, debug=True) # Added debug=True for development
+    app.run(host='0.0.0.0', port=5000, debug=True)
