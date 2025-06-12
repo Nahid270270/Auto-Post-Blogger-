@@ -2,11 +2,11 @@ from flask import Flask, render_template_string, request, redirect, url_for, Res
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 import requests, os
-from functools import wraps # এই লাইনটি যোগ করা হয়েছে
-from dotenv import load_dotenv # .env ফাইল থেকে লোড করার জন্য যোগ করা হয়েছে
+from functools import wraps
+from dotenv import load_dotenv
 
 # .env ফাইল থেকে এনভায়রনমেন্ট ভেরিয়েবল লোড করুন (শুধুমাত্র লোকাল ডেভেলপমেন্টের জন্য)
-load_dotenv() 
+load_dotenv()
 
 app = Flask(__name__)
 
@@ -1102,7 +1102,7 @@ detail_html = """
 # --- END OF detail_html TEMPLATE ---
 
 
-# --- START OF admin_html TEMPLATE --- (কোন পরিবর্তন নেই)
+# --- START OF admin_html TEMPLATE --- (সার্চ ফর্ম সহ নতুন কোড)
 admin_html = """
 <!DOCTYPE html>
 <html>
@@ -1136,7 +1136,7 @@ admin_html = """
         font-weight: bold;
         color: #ddd;
     }
-    input[type="text"], input[type="url"], textarea, button, select, input[type="number"] { /* Added select for dropdown */
+    input[type="text"], input[type="url"], textarea, button, select, input[type="number"], input[type="search"] { /* Added input[type="search"] */
       width: 100%;
       padding: 10px;
       margin-bottom: 15px;
@@ -1324,9 +1324,18 @@ admin_html = """
     <button type="submit">Add Content</button>
   </form>
 
+  <h2 style="margin-top: 40px;">Search Content</h2> {# New Search Section #}
+  <form method="GET" action="{{ url_for('admin') }}">
+    <div class="form-group">
+      <label for="admin_search_query">Search by Title:</label>
+      <input type="search" name="q" id="admin_search_query" placeholder="Search content by title..." value="{{ admin_query|default('') }}" />
+    </div>
+    <button type="submit">Search</button>
+  </form>
+
   <hr>
 
-  <h2>Manage Existing Content</h2>
+  <h2>Manage Existing Content {% if admin_query %}for "{{ admin_query }}"{% endif %}</h2> {# Updated Heading #}
   <div class="movie-list-container">
     {% if movies %}
     <table>
@@ -1345,7 +1354,7 @@ admin_html = """
         <tr>
           <td>{{ movie.title }}</td>
           <td>{{ movie.type | title }}</td>
-          <td>{{ movie.quality }}</td>
+          <td>{% if movie.quality %}{{ movie.quality }}{% else %}N/A{% endif %}</td> {# Handle cases where quality might be None #}
           <td>{% if movie.quality == 'TRENDING' %}Yes{% else %}No{% endif %}</td>
           <td>{% if movie.is_coming_soon %}Yes{% else %}No{% endif %}</td>
           <td class="action-buttons">
@@ -2001,16 +2010,26 @@ def admin():
         try:
             movies.insert_one(movie_data)
             print(f"Content '{movie_data['title']}' added successfully to MovieZone!")
-            return redirect(url_for('admin'))
+            return redirect(url_for('admin')) # Redirect to admin after POST
         except Exception as e:
             print(f"Error inserting content into MongoDB: {e}")
             return redirect(url_for('admin'))
 
-    # Fetch all content for displaying in the admin panel
-    all_content = list(movies.find().sort('_id', -1))
+    # --- GET request handling (Modified for search) ---
+    admin_query = request.args.get('q') # Get the search query from URL
+
+    if admin_query:
+        # Search content by title (case-insensitive regex)
+        all_content = list(movies.find({"title": {"$regex": admin_query, "$options": "i"}}).sort('_id', -1))
+    else:
+        # If no search query, fetch all content (as before)
+        all_content = list(movies.find().sort('_id', -1))
+    
+    # Convert ObjectIds to string for template
     for content in all_content:
-        content['_id'] = str(content['_id']) # Convert ObjectId to string for template
-    return render_template_string(admin_html, movies=all_content)
+        content['_id'] = str(content['_id']) 
+
+    return render_template_string(admin_html, movies=all_content, admin_query=admin_query)
 
 
 @app.route('/edit_movie/<movie_id>', methods=["GET", "POST"])
@@ -2209,4 +2228,3 @@ def coming_soon():
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000, debug=True)
-
